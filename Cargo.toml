@@ -1,0 +1,35 @@
+[package]
+name = "civkit"
+license = "Apache-2.0"
+version = "1.0.1"
+authors = ["Antoine Riard <dev@ariard.me>"]
+description = "A Civ Kit node with Bulletin Board support"
+edition = "2021"
+
+[[bin]]
+name = "civkitd"
+path = "src/server.rs"
+
+[[bin]]
+name = "civkit-cli"
+path = "src/client.rs"
+
+[[bin]]
+name = "civkit-sample"
+path = "src/sample.rs"
+
+[dependencies]
+futures-channel = "0.3.28"
+futures-util = "0.3.28"
+lightning = { git = "https://github.com/civkit/rust-lightning.git", branch = "civkit-branch" }
+lightning-net-tokio = { git = "https://github.com/civkit/rust-lightning.git", branch = "civkit-branch" }
+tokio = { version = "1", features = [ "io-util", "macros", "rt", "rt-multi-thread", "sync", "net", "time" ] }
+tokio-tungstenite = "0.19.0"
+bitcoin = "0.29.0"
+tonic = "0.9"
+prost = "0.11"
+nostr = { path = "../nostr/crates/nostr" }
+url = "2.4.0"
+
+[build-dependencies]
+tonic-build = "0.9"

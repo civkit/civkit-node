@@ -1,0 +1,92 @@
+
+syntax = "proto3";
+
+package boardctrl;
+
+service BoardCtrl {
+	rpc PingHandle (PingRequest) returns (PongRequest);
+	rpc ShutdownHandle (ShutdownRequest) returns (ShutdownReply);
+	/* NIP 01 from client to relay - EVENT: Kind 1 `text_note` */
+	rpc PublishTextNote (SendNote) returns (ReceivedNote);
+	rpc ListClients (ListClientRequest) returns (ListClientReply);
+	rpc ListSubscriptions (ListSubscriptionRequest) returns (ListSubscriptionReply);
+	rpc ConnectPeer (PeerConnectionRequest) returns (PeerConnectionReply);
+	rpc ListPeers (ListPeersRequest) returns (ListPeersReply);
+	rpc StatusHandle (BoardStatusRequest) returns (BoardStatusReply);
+	rpc DisconnectClient (DisconnectClientRequest) returns (DisconnectClientReply);
+	/* NIP 01 - from relay to client: NOTICE */
+	rpc PublishNotice (SendNotice) returns (ReceivedNotice);
+}
+
+message PingRequest {
+	string name = 1;
+}
+
+message PongRequest {
+	string name = 1;
+}
+
+message ShutdownRequest {
+}
+
+message ShutdownReply {
+}
+
+message SendNote {
+	string content = 1;
+}
+
+message ReceivedNote {
+	string name = 1;
+}
+
+message ListClientRequest {
+}
+
+message ListClientReply {
+	uint64 clients = 1;
+}
+
+message ListSubscriptionRequest {
+
+}
+
+message ListSubscriptionReply {
+	uint64 subscriptions = 1;
+}
+
+message PeerConnectionRequest {
+	uint64 local_port = 1;
+}
+
+message PeerConnectionReply {
+
+}
+
+message ListPeersRequest {
+}
+
+message ListPeersReply {
+	uint64 peers = 1;
+}
+
+message BoardStatusRequest {
+}
+
+message BoardStatusReply {
+	uint64 offers = 1;
+}
+
+message DisconnectClientRequest {
+	uint64 client_id = 1;
+}
+
+message DisconnectClientReply {
+}
+
+message SendNotice {
+	string info_message = 1;
+}
+
+message ReceivedNotice {
+}
