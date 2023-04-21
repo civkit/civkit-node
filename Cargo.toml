@@ -1,0 +1,14 @@
+[package]
+name = "civkit-node"
+license = "Apache-2.0"
+version = "0.0.1"
+authors = ["Antoine Riard <dev@ariard.me>"]
+description = "A Civ Kit node with Bulletin Board support"
+edition = "2018"
+
+[[bin]]
+name = "civkitd"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = [ "io-util", "macros", "rt", "rt-multi-thread", "sync", "net", "time" ] }
