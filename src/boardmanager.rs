@@ -21,6 +21,9 @@ use bitcoin::secp256k1;
 
 use civkit::events;
 use civkit::anchormanager::AnchorManager;
+use civkit::credentialgateway::CredentialGateway;
+use civkit::kindprocessor::KindProcessor;
+use civkit::nodesigner::NodeSigner;
 
 use std::sync::Mutex;
 use std::sync::Arc;
@@ -30,28 +33,28 @@ pub struct BoardManager
 	//default_configuration: 
 	genesis_hash: BlockHash,
 
-	//credentials_gateway: G,
-	//kind_processor: K,
-	//node_signer: S,
+	credential_gateway: Arc<CredentialGateway>,
+	kind_processor: Arc<KindProcessor>,
+	node_signer: Arc<NodeSigner>,
 	anchor_manager: Arc<AnchorManager>,
 
 	our_board_pubkey: PublicKey,
 	secp_ctx: Secp256k1<secp256k1::All>,
-
-	//TODO: persistence
-	//TODO: kind handler
 
 	pending_kind_events: Mutex<Vec<events::Event>>
 }
 
 impl BoardManager
 {
-	pub fn new(anchor_manager: Arc<AnchorManager>) -> Self {
+	pub fn new(credential_gateway: Arc<CredentialGateway>, node_signer: Arc<NodeSigner>, anchor_manager: Arc<AnchorManager>, kind_processor: Arc<KindProcessor>) -> Self {
 		let secp_ctx = Secp256k1::new();
 		let pubkey = PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[42;32]).unwrap());
 		BoardManager {
 			genesis_hash: genesis_block(Network::Testnet).header.block_hash(),
-			anchor_manager: anchor_manager.clone(),
+			credential_gateway,
+			kind_processor,
+			anchor_manager,
+			node_signer,
 			our_board_pubkey: pubkey,
 			secp_ctx,
 			pending_kind_events: Mutex::new(Vec::new()),
