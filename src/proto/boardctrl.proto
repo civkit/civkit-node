@@ -1,0 +1,18 @@
+
+
+
+syntax = "proto3";
+
+package boardctrl;
+
+service BoardCtrl {
+	rpc PingHandle (PingRequest) returns (PongRequest);
+}
+
+message PingRequest {
+	string name = 1;
+}
+
+message PongRequest {
+	string name = 1;
+}

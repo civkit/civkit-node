@@ -1,14 +1,24 @@
 [package]
-name = "civkit-node"
+name = "civkit"
 license = "Apache-2.0"
-version = "0.0.1"
+version = "1.0.1"
 authors = ["Antoine Riard <dev@ariard.me>"]
 description = "A Civ Kit node with Bulletin Board support"
-edition = "2018"
+edition = "2021"
 
 [[bin]]
 name = "civkitd"
-path = "src/main.rs"
+path = "src/server.rs"
+
+[[bin]]
+name = "civkit-cli"
+path = "src/client.rs"
 
 [dependencies]
 tokio = { version = "1", features = [ "io-util", "macros", "rt", "rt-multi-thread", "sync", "net", "time" ] }
+bitcoin = "0.29.0"
+tonic = "0.9"
+prost = "0.11"
+
+[build-dependencies]
+tonic-build = "0.9"

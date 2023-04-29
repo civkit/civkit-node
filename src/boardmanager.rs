@@ -20,6 +20,7 @@ use bitcoin::secp256k1::Secp256k1;
 use bitcoin::secp256k1;
 
 use civkit::events;
+use civkit::events::{MessageSendKind, MessageSendKindProvider};
 use civkit::anchormanager::AnchorManager;
 use civkit::credentialgateway::CredentialGateway;
 use civkit::kindprocessor::KindProcessor;
@@ -41,7 +42,7 @@ pub struct BoardManager
 	our_board_pubkey: PublicKey,
 	secp_ctx: Secp256k1<secp256k1::All>,
 
-	pending_kind_events: Mutex<Vec<events::Event>>
+	pending_kind_events: Mutex<Vec<events::MessageSendKind>>
 }
 
 impl BoardManager
@@ -59,5 +60,11 @@ impl BoardManager
 			secp_ctx,
 			pending_kind_events: Mutex::new(Vec::new()),
 		}
+	}
+}
+
+impl MessageSendKindProvider for BoardManager {
+	fn get_and_clear_pending_kinds(&self) -> Vec<MessageSendKind> {
+		return (vec![])
 	}
 }

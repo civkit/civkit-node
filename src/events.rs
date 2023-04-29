@@ -7,9 +7,13 @@
 // You may not use this file except in accordance with one or both of these
 // licenses.
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Event {
+#[derive(Clone, Debug)]
+pub enum MessageSendKind {
 	Offers {
 		sha256: [u8; 32],
 	}
+}
+
+pub trait MessageSendKindProvider {
+	fn get_and_clear_pending_kinds(&self) -> Vec<MessageSendKind>;
 }
