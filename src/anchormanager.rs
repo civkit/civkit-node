@@ -13,6 +13,14 @@
 
 /// An interface to commit a kind in the Bitcoin chain by relying on a notary
 /// service.
+
+use std::sync::Arc;
+use std::sync::Mutex;
+
+// use civkit::events;
+use civkit::events::{MessageSendKind, MessageSendKindProvider};
+use civkit::kindprocessor::KindProcessor;
+
 pub struct AnchorManager {}
 
 impl AnchorManager {
@@ -22,3 +30,8 @@ impl AnchorManager {
 
 	fn commit_kind(&self) {}
 }
+
+impl MessageSendKindProvider for AnchorManager {
+       fn get_and_clear_pending_kinds(&self) -> Vec<MessageSendKind> {
+               return (vec![])
+       }
