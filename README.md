@@ -6,9 +6,7 @@ https://civkit.org/
 About Civkit Node
 -----------------
 
-CivKit Node is an experimental NIP-01 Rust relay coupled with work-in-progress
-communications gateways for BOLT8 Noise transport and BOLT4 sphinx onion routing.
-There is a companion client binary for development and testing.
+The CivKit Node represents an experimental NIP-01 Rust relay, complemented by ongoing development of communication gateways for BOLT8 Noise transport and BOLT4 sphinx onion routing. Alongside this, there is a companion client binary designed specifically for development and testing purposes.
 
 CivKit Node aims to enable a peer-to-peer electronic market system as described in the [paper](https://github.com/civkit/paper/blob/main/civ_kit_paper.pdf).
 
