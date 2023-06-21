@@ -115,6 +115,12 @@ If you're new to the project, it's advisable to begin with smaller tasks to get 
 Discussions regarding codebase enhancements take place on GitHub issues and pull requests, 
 while communication regarding the development of CivKit Node primarily occurs on the CivKit Discord platform.
 
+Building
+--------
+
+Install protobuf
+Cargo build
+
 Tagline
 -------
 
