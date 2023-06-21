@@ -12,7 +12,7 @@ There is a companion client binary for development and testing.
 
 CivKit Node aims to enable a peer-to-peer electronic market system as described in the [paper](https://github.com/civkit/paper/blob/main/civ_kit_paper.pdf).
 
-This is not production-ready software, thanks to not use it for real deployment for now.
+This is not production-ready software, please do not use it for real deployment for now.
 
 Project Architecture
 --------------------
