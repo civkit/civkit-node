@@ -108,13 +108,12 @@ Connecting to a BOLT8 peer on local.
 Development Process
 -------------------
 
-The CivKit Node project operates an open contributor model where anyone is
-welcome to contribute towards development in the form of peer review, documentation,
-testing and patches. If you're getting started, first and foremost, start small.
+The CivKit Node project embraces an open contributor model, inviting individuals to contribute 
+through peer reviews, documentation, testing, and patches. 
 
-Discussion about code base improvements happens in Github issues and on pull requests.
-
-Communications about the development of CivKit Node happens primarily on the CivKit Discord.
+If you're new to the project, it's advisable to begin with smaller tasks to get acquainted. 
+Discussions regarding codebase enhancements take place on GitHub issues and pull requests, 
+while communication regarding the development of CivKit Node primarily occurs on the CivKit Discord platform.
 
 Tagline
 -------
