@@ -120,7 +120,9 @@ Building
 
 Install protobuf
 
+```
 Cargo build
+```
 
 Tagline
 -------
