@@ -28,7 +28,7 @@ tokio-tungstenite = "0.19.0"
 bitcoin = "0.29.0"
 tonic = "0.9"
 prost = "0.11"
-nostr = { path = "../nostr/crates/nostr" }
+nostr = "0.22"
 url = "2.4.0"
 
 [build-dependencies]
