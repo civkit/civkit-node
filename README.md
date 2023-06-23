@@ -121,7 +121,9 @@ Building
 Install protobuf
 
 ```
-Cargo build
+cargo build
+cd target/debug
+#run commands above like ./civkitd
 ```
 
 Tagline
