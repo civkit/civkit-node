@@ -87,7 +87,8 @@ Connecting to a BOLT8 peer on local.
 ```
 ./civkitd (civtkid #1)
 
-./civkitd /* noise port */ 60001 /* nostr port */ 60011 cli_port 60021 (civkitd #2)
+./civkitd 
+./civkitd --noise-port 60001 --nostr-port 60011 --cli-port 60021 (civkitd #2)
 
 ./civkit-cli connectpeer 60001
 

@@ -26,6 +26,8 @@ use civkit::events::{ClientEvents, EventsProvider, ServerCmd};
 
 use boardctrl::board_ctrl_server::{BoardCtrl, BoardCtrlServer};
 
+use clap::Parser;
+
 use nostr::{Keys, EventBuilder};
 
 use std::env;
@@ -162,20 +164,26 @@ impl BoardCtrl for ServiceManager {
 	}
 }
 
+#[derive(Parser, Debug)]
+struct Cli {
+	/// The port to listen for BOLT8 peers
+	#[clap(long, short = 'p', default_value = "50011")]
+	noise_port: String,
+	/// Nostr relay port
+	#[clap(short, long, default_value = "50021")]
+	nostr_port: String,
+	/// The port to listen for CLI connections
+	#[clap(short, long, default_value = "50031")]
+	cli_port: String,
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> 
 {
-	//TODO: have a UNIX help
+	let cli = Cli::parse();
 	println!("[CIVKITD] - INIT: CivKit node starting up...");
-
 	//TODO add a Logger interface
 
-	let noise_port = env::args().nth(1).unwrap_or_else(|| "50011".to_string());
-
-	let nostr_port = env::args().nth(2).unwrap_or_else(|| "50021".to_string());
-
-	let cli_port = env::args().nth(3).unwrap_or_else(|| "50031".to_string());
-
-	println!("[CIVKITD] - INIT: noise port {} nostr port {} cli_port {}", noise_port, nostr_port, cli_port);
+	println!("[CIVKITD] - INIT: noise port {} nostr port {} cli_port {}", cli.noise_port, cli.nostr_port, cli.cli_port);
 
 	let rt = Runtime::new()?;
 
@@ -212,7 +220,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 	// Main handler of services provision.
 	let board_manager = ServiceManager::new(credential_gateway, node_signer, anchor_manager, note_processor, board_events_send, board_peer_send);
 
-	let addr = format!("[::1]:{}", cli_port).parse()?;
+	let addr = format!("[::1]:{}", cli.cli_port).parse()?;
 
 	let board_svc = Server::builder()
 		.add_service(BoardCtrlServer::new(board_manager))
@@ -248,7 +256,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
 	// We start the tcp listener for BOLT8 peers.
 	tokio::spawn(async move {
-		let listener = tokio::net::TcpListener::bind(format!("[::1]:{}", noise_port)).await.expect("Failed to bind to listen port");
+		let listener = tokio::net::TcpListener::bind(format!("[::1]:{}", cli.noise_port)).await.expect("Failed to bind to listen port");
 
 		loop {
 			let inbound_peer_mgr = peer_manager.clone();
@@ -269,7 +277,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
 	// We start the tcp listener for NIP-01 clients.
 	tokio::spawn(async move {
-		let try_socket = TcpListener::bind(format!("[::1]:{}", nostr_port)).await;
+		let try_socket = TcpListener::bind(format!("[::1]:{}", cli.nostr_port)).await;
 		let listener = try_socket.expect("Failed to bind");
 
 		println!("[CIVKITD] - NET: ready to listen tcp connection for clients !");
