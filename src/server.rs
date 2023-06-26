@@ -179,6 +179,19 @@ impl BoardCtrl for ServiceManager {
 
 		Ok(Response::new(boardctrl::ReceivedNotice {}))
 	}
+
+	async fn publish_offer(&self, request: Request<boardctrl::SendOffer>) -> Result<Response<boardctrl::ReceivedOffer>, Status> {
+		let offer_message = request.into_inner().offer;
+
+		let service_keys = Keys::generate();
+ 
+		{
+			let mut board_send_lock = self.service_events_send.lock().unwrap();
+			board_send_lock.send(ClientEvents::Offer { });
+		}
+
+		Ok(Response::new(boardctrl::ReceivedOffer {}))
+	}
 }
 
 #[derive(Parser, Debug)]
