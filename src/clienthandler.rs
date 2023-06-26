@@ -245,6 +245,9 @@ impl ClientHandler {
 								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending notice"); },
 							}
 						},
+						ClientEvents::Offer { } => {
+							let random_id = SubscriptionId::generate();
+						},
 						_ => {}
 					}
 				}
