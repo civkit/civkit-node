@@ -65,7 +65,7 @@ Civkit sample startup successful. Enter "help" to view available commands.
 
 /* On logs of civkitd  */
 [CIVKITD] - INIT: CivKit node starting up...
-[CIVKITD] - INIT: noise port 50011 nostr port 50021 cli_port 50031
+[CIVKITD] - INIT: noise port 9735 nostr port 50021 cli_port 50031
 [CIVKITD] - NET: ready to listen tcp connection for clients !
 [CIVKITD] - NET: receive a tcp connection !
 [CIVKITD] - NET: incoming tcp Connection from :[::1]:50422
@@ -94,7 +94,7 @@ Connecting to a BOLT8 peer on local.
 
 /* On logs of civkitd #1 */
 [CIVKITD] - INIT: CivKit node starting up...
-[CIVKITD] - INIT: noise port 50011 nostr port 50021 cli_port 50031
+[CIVKITD] - INIT: noise port 9735 nostr port 50021 cli_port 50031
 [CIVKITD] - NET: ready to listen tcp connection for clients !
 [CIVKITD] - CONTROL: sending port to noise gateway !
 [CIVKITD] - NOISE: opening outgoing noise connection!

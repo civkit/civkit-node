@@ -167,7 +167,7 @@ impl BoardCtrl for ServiceManager {
 #[derive(Parser, Debug)]
 struct Cli {
 	/// The port to listen for BOLT8 peers
-	#[clap(long, short = 'p', default_value = "50011")]
+	#[clap(long, short = 'p', default_value = "9735")]
 	noise_port: String,
 	/// Nostr relay port
 	#[clap(short, long, default_value = "50021")]
