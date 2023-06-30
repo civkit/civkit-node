@@ -116,6 +116,10 @@ If you're new to the project, it's advisable to begin with smaller tasks to get 
 Discussions regarding codebase enhancements take place on GitHub issues and pull requests, 
 while communication regarding the development of CivKit Node primarily occurs on the CivKit Discord platform.
 
+For more "how-to" on contributing to an open-source in the Bitcoin ecosystem, have a look on
+documentation written by experienced Bitcoin protocols developers on [how to make a PR](https://github.com/jonatack/bitcoin-development/blob/master/how-to-make-bitcoin-core-prs.md)
+and [how to review a PR](https://github.com/jonatack/bitcoin-development/blob/master/how-to-review-bitcoin-core-prs.md).
+
 Building
 --------
 
