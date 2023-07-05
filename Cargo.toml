@@ -28,7 +28,7 @@ tokio-tungstenite = "0.19.0"
 bitcoin = "0.29.0"
 tonic = "0.9"
 prost = "0.11"
-nostr = "0.22"
+nostr = { git = "https://github.com/civkit/nostr.git", branch = "civkit-branch" }
 url = "2.4.0"
 clap = { version = "4.3.8", features = ["derive"] }
 
