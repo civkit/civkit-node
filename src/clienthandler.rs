@@ -340,7 +340,7 @@ impl ClientHandler {
 						match client_msg {
 							ClientMessage::Event(msg) => {
 								if let Some(nostr_client) = self.clients.get_mut(&id) {
-									if nostr_client.has_pubkey() {
+									if !nostr_client.has_pubkey() {
 										nostr_client.add_pubkey(msg.pubkey.clone());
 									}
 								}
