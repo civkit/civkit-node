@@ -10,9 +10,13 @@
 //! Internal events used to exchange information between ServiceManager and
 //! ClientHandler.
 
+use crate::clienthandler::NostrClient;
+
 use nostr::{Event, SubscriptionId};
 
-#[derive(Clone, Debug)]
+use tokio::sync::oneshot;
+
+#[derive(Debug)]
 pub enum ClientEvents {
 	TextNote { event: Event },
 	Server { cmd: ServerCmd },
@@ -21,9 +25,10 @@ pub enum ClientEvents {
 	SubscribedEvent { client_id: u64, sub_id: SubscriptionId, event: Event },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum ServerCmd {
 	DisconnectClient { client_id: u64 },
+	GetClients { respond_to: oneshot::Sender<Vec<NostrClient>> }
 }
 
 pub trait EventsProvider {

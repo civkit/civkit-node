@@ -12,7 +12,7 @@
 mod boardmanager;
 
 use crate::boardmanager::ServiceManager;
-use civkit::clienthandler::ClientHandler;
+use civkit::clienthandler::{NostrClient, ClientHandler};
 use civkit::anchormanager::AnchorManager;
 use civkit::credentialgateway::CredentialGateway;
 use civkit::kindprocessor::NoteProcessor;
@@ -38,7 +38,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Runtime;
-use tokio::sync::mpsc;
+use tokio::sync::{oneshot, mpsc};
 
 use tokio_tungstenite::WebSocketStream;
 
@@ -117,9 +117,27 @@ impl BoardCtrl for ServiceManager {
 	}
 
 	async fn list_clients(&self, request: Request<boardctrl::ListClientRequest>) -> Result<Response<boardctrl::ListClientReply>, Status> {
-
+		println!("[CIVKITD] - CONTROL: sending list-clients request to ClientHandler!");
+		let (send, recv) = oneshot::channel::<Vec<NostrClient>>();
+		{
+			let mut board_send_lock = self.service_events_send.lock().unwrap();
+			board_send_lock.send(ClientEvents::Server { cmd: ServerCmd::GetClients { respond_to: send }});
+		}
+		let response = recv.await.expect("ClientHandler has been killed");
+		
+		let board_clients: Vec<boardctrl::Client> = response
+    		.iter()
+    		.map(|client| {
+				boardctrl::Client {
+					pubkey: client.pubkey.map(|s| s.to_string()).unwrap_or("".to_string()),
+					client_id: client.client_id,
+					associated_socket: client.associated_socket.to_string(),
+					subscriptions: client.subscriptions.len() as u64,
+				}
+			})
+			.collect();
 		let client_query = boardctrl::ListClientReply {
-			clients: 1,
+			clients: board_clients,
 		};
 	
 		Ok(Response::new(client_query))

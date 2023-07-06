@@ -37,13 +37,14 @@ use tokio_tungstenite::tungstenite::Message;
 /// Max number of subscriptions by connected clients.
 const MAX_SUBSCRIPTIONS: u64 = 100;
 
-struct NostrClient {
+#[derive(Debug, Clone)]
+pub struct NostrClient {
 	//TODO: check we're using Schnorr not ECDSA
-	pubkey: Option<XOnlyPublicKey>,
-	client_id: u64,
-	associated_socket: SocketAddr,
+	pub pubkey: Option<XOnlyPublicKey>,
+	pub client_id: u64,
+	pub associated_socket: SocketAddr,
 
-	subscriptions: HashMap<u64, ()>,
+	pub subscriptions: HashMap<u64, ()>,
 }
 
 impl NostrClient {
@@ -198,7 +199,26 @@ impl ClientHandler {
 
 				if let Ok(event) = handler_receive_lock.await.try_recv() {
 					println!("[CIVKITD] - PROCESSING: received an event from service manager");
-					client_event = Some(event);
+					// Handle server requests
+					if let ClientEvents::Server{ cmd } = event {
+						match cmd {
+							ServerCmd::GetClients { respond_to } => {
+								let all_clients = self.clients.values().cloned().collect::<Vec<NostrClient>>();
+								let _ = respond_to.send(all_clients);
+							},
+							ServerCmd::DisconnectClient { client_id } => {
+								let map_send_lock = self.map_send.lock();
+								if let Some(outgoing_send) = map_send_lock.await.get(&client_id) {
+									match outgoing_send.send(MAGIC_SERVER_PAYLOAD.clone().to_vec()) {
+										Ok(_) => {},
+										Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending disconnect"); }
+									}
+								}
+							},
+						}
+					} else {
+						client_event = Some(event)
+					}	
 				}
 			}
 
@@ -215,18 +235,6 @@ impl ClientHandler {
 							match outgoing_send.send(serialized_message.into_bytes()) {
 								Ok(_) => {},
 								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending note"); }
-							}
-						},
-						ClientEvents::Server { ref cmd } => {
-							match cmd {
-								ServerCmd::DisconnectClient { client_id } => {
-									if id == client_id {
-										match outgoing_send.send(MAGIC_SERVER_PAYLOAD.clone().to_vec()) {
-											Ok(_) => {},
-											Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending disconnect"); }
-										}
-									}
-								}
 							}
 						},
 						ClientEvents::RelayNotice { ref message } => {
