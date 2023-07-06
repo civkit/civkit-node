@@ -16,8 +16,7 @@ use bitcoin::secp256k1::Secp256k1;
 use nostr::{RelayMessage, Event, ClientMessage, SubscriptionId, Filter};
 use nostr::key::XOnlyPublicKey;
 
-use civkit::events;
-use civkit::events::{ClientEvents, EventsProvider, ServerCmd};
+use crate::events::{ClientEvents, EventsProvider, ServerCmd};
 
 use futures_util::{future, pin_mut, TryStreamExt, StreamExt, SinkExt};
 

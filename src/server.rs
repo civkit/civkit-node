@@ -10,10 +10,9 @@
 /// Main server of the CivKit Node, orchestrate all the components.
 
 mod boardmanager;
-mod clienthandler;
 
 use crate::boardmanager::ServiceManager;
-use crate::clienthandler::ClientHandler;
+use civkit::clienthandler::ClientHandler;
 use civkit::anchormanager::AnchorManager;
 use civkit::credentialgateway::CredentialGateway;
 use civkit::kindprocessor::NoteProcessor;

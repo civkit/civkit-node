@@ -14,3 +14,4 @@ pub mod kindprocessor;
 pub mod nodesigner;
 pub mod oniongateway;
 pub mod peerhandler;
+pub mod clienthandler;
