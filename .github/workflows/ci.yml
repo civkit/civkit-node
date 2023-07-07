@@ -1,0 +1,73 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+  build:
+    # This job tests on Ubuntu and macOS.
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, macos-13]
+        rust:
+          - stable
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Install Rust Toolchain (stable)
+      run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+    
+    - name: Install protobuf compiler
+      run: |
+        if [ "${{ matrix.os }}" == "macos-13" ]; then
+          brew install protobuf
+        else
+          sudo apt-get install -y protobuf-compiler
+        fi
+
+    - name: Build civkit-cli
+      run: cargo build --bin civkit-cli --verbose
+
+    - name: Build civkitd
+      run: cargo build --bin civkitd --verbose
+
+    - name: Build civkit-sample
+      run: cargo build --bin civkit-sample --verbose
+# debian is run on docker on ubuntu as it is not supported natively by ga runners.
+  build_debian:
+    # This job tests on Debian.
+    runs-on: ubuntu-22.04
+
+    container:
+      image: debian:11.7
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: |
+          apt-get update
+          apt-get install -y curl gcc protobuf-compiler
+
+    - name: Install Rust Toolchain (stable)
+      shell: bash
+      run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    -  uses: Swatinem/rust-cache@v2
+    - name: Build civkit-cli
+      run: cargo build --bin civkit-cli --verbose
+
+    - name: Build civkitd
+      run: cargo build --bin civkitd --verbose
+
+    - name: Build civkit-sample
+      run: cargo build --bin civkit-sample --verbose
