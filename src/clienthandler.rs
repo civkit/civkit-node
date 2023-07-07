@@ -13,11 +13,12 @@ use bitcoin::secp256k1;
 use bitcoin::secp256k1::SecretKey;
 use bitcoin::secp256k1::Secp256k1;
 
-
 use nostr::{RelayMessage, Event, ClientMessage, SubscriptionId, Filter};
 use nostr::key::XOnlyPublicKey;
 
+use crate::events;
 use crate::events::{ClientEvents, EventsProvider, ServerCmd};
+use crate::nostr_db::log_new_event_db;
 
 use futures_util::{future, pin_mut, TryStreamExt, StreamExt, SinkExt};
 
@@ -354,7 +355,11 @@ impl ClientHandler {
 										nostr_client.add_pubkey(msg.pubkey.clone());
 									}
 								}
+								let msg_2 = msg.clone();
 								self.filter_events(*msg).await;
+								//TODO: we should link our filtering policy to our db storing,
+								//otherwise this is a severe DoS vector
+								log_new_event_db(*msg_2);
 							},
 							ClientMessage::Req { subscription_id, filters } => {
 								self.subscriptions_counter += 1;

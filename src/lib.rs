@@ -8,6 +8,7 @@
 // licenses.
 
 pub mod events;
+pub mod nostr_db;
 pub mod anchormanager;
 pub mod credentialgateway;
 pub mod kindprocessor;
