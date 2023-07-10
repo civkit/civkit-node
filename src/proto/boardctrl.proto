@@ -43,8 +43,15 @@ message ReceivedNote {
 message ListClientRequest {
 }
 
+message Client {
+	string pubkey = 1;
+	uint64 client_id = 2;
+	string associated_socket = 3;
+	uint64 subscriptions = 4;
+}
+
 message ListClientReply {
-	uint64 clients = 1;
+	repeated Client clients = 1;
 }
 
 message ListSubscriptionRequest {
