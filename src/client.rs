@@ -37,8 +37,8 @@ enum Command {
 	Shutdown,
 	/// Send a demo NIP-01 EVENT kind 1 to all the connected clients
 	Publishtextnote,
-	/// List information about connected clients [TODO]
-	Listclient,
+	/// List information about connected clients
+	Listclients,
 	/// List information about subscriptions [TODO]
 	Listsubscriptions,
 	/// Connect to a BOLT8 peer on local port
@@ -83,12 +83,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 			println!("[CIVKIT-CLI] {}", response.into_inner().name);
 		}
-		Command::Listclient => {
+		Command::Listclients => {
 			let request = tonic::Request::new(ListClientRequest {});
 
 			let response = client.list_clients(request).await?;
 
-			println!("[CIVKIT-CLI] clients {}", response.into_inner().clients);
+			println!("[CIVKIT-CLI] clients {:#?}", response.into_inner().clients);
 		}
 		Command::Listsubscriptions => {
 			let request = tonic::Request::new(ListSubscriptionRequest {});
