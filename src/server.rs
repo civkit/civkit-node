@@ -198,6 +198,18 @@ impl BoardCtrl for ServiceManager {
 
 		Ok(Response::new(boardctrl::ReceivedOffer {}))
 	}
+
+	async fn publish_invoice(&self, request: Request<boardctrl::SendInvoice>) -> Result<Response<boardctrl::ReceivedInvoice>, Status> {
+		let invoice_message = request.into_inner().invoice;
+
+		let service_keys = Keys::generate();
+		{
+			let mut board_send_lock = self.service_events_send.lock().unwrap();
+			board_send_lock.send(ClientEvents::Invoice { });
+		}
+
+		Ok(Response::new(boardctrl::ReceivedInvoice {}))
+	}
 }
 
 #[derive(Parser, Debug)]

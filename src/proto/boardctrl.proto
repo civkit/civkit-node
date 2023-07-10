@@ -17,6 +17,7 @@ service BoardCtrl {
 	/* NIP 01 - from relay to client: NOTICE */
 	rpc PublishNotice (SendNotice) returns (ReceivedNotice);
 	rpc PublishOffer (SendOffer) returns (ReceivedOffer);
+	rpc PublishInvoice (SendInvoice) returns (ReceivedInvoice);
 }
 
 message PingRequest {
@@ -104,4 +105,11 @@ message SendOffer {
 }
 
 message ReceivedOffer {
+}
+
+message SendInvoice {
+	bytes invoice = 1;
+}
+
+message ReceivedInvoice {
 }
