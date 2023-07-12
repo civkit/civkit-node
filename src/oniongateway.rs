@@ -45,7 +45,7 @@ impl OnionBox {
 		let logger = Arc::new(FakeLogger {});
 		let ignoring_message_handler = IgnoringMessageHandler {};
 
-		let onion_messenger = OnionMessenger::new(&keys_manager, &keys_manager_2, logger, &ignoring_message_handler);
+		//let onion_messenger = OnionMessenger::new(&keys_manager, &keys_manager_2, logger, &ignoring_message_handler);
 
 		OnionBox {
 			our_node_pubkey: pubkey,

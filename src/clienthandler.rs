@@ -245,6 +245,15 @@ impl ClientHandler {
 								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending notice"); },
 							}
 						},
+						ClientEvents::OrderNote { ref order } => {
+							let random_id = SubscriptionId::generate();
+							let relay_message = RelayMessage::new_event(random_id, order.clone());
+							let serialized_message = relay_message.as_json();
+							match outgoing_send.send(serialized_message.into_bytes()) {
+								Ok(_) => {},
+								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending order"); }
+							}
+						},
 						_ => {}
 					}
 				}

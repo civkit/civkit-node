@@ -16,6 +16,7 @@ service BoardCtrl {
 	rpc DisconnectClient (DisconnectClientRequest) returns (DisconnectClientReply);
 	/* NIP 01 - from relay to client: NOTICE */
 	rpc PublishNotice (SendNotice) returns (ReceivedNotice);
+	rpc PublishOffer (SendOffer) returns (ReceivedOffer);
 }
 
 message PingRequest {
@@ -96,4 +97,11 @@ message SendNotice {
 }
 
 message ReceivedNotice {
+}
+
+message SendOffer {
+	bytes offer = 1;
+}
+
+message ReceivedOffer {
 }

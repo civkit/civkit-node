@@ -225,17 +225,18 @@ async fn poll_for_server_output(mut rx: futures_channel::mpsc::UnboundedReceiver
                 //println!("Received message {}", msg_json);
                 if let Ok(relay_msg) = RelayMessage::from_json(msg_json) {
                     match relay_msg {
-					RelayMessage::Event { subscription_id, event } => {
-                            //TODO: NIP 01: `EVENT` messages MUST be sent only with a subscriptionID related to a subscription previously initiated by the client (using the `REQ` message above)`
-                            println!("\n[EVENT] {}", event.content);
-                            print!("> ");
-                            io::stdout().flush().unwrap();
-					},
+			RelayMessage::Event { subscription_id, event } => {
+			    //TODO: NIP 01: `EVENT` messages MUST be sent only with a subscriptionID related to a subscription previously initiated by the client (using the `REQ` message above)`
+			    let display_board_order = if event.kind == Kind::Order { true } else { false };
+			    println!("\n[EVENT] {}  {}", if display_board_order { "new trade offer: " } else { "" }, event.content);
+			    print!("> ");
+			    io::stdout().flush().unwrap();
+			},
                         RelayMessage::Notice { message } => {
                             println!("\n[NOTICE] {}", message);
                             print!("> ");
                             io::stdout().flush().unwrap();
-					},
+			},
                         RelayMessage::EndOfStoredEvents(sub_id) => {
                             println!("\n[EOSE] {}", sub_id);
                             print!("> ");
@@ -243,7 +244,7 @@ async fn poll_for_server_output(mut rx: futures_channel::mpsc::UnboundedReceiver
 					},
 					_ => { println!("Unknown server message"); }
                         }
-			} else { println!("RelayMessage deserialization failure"); }
+		} else { println!("RelayMessage deserialization failure"); }
         }
     }
 }

@@ -23,6 +23,8 @@ use civkit::oniongateway::OnionBox;
 
 use civkit::events::{ClientEvents, EventsProvider, ServerCmd};
 
+use lightning::offers::offer::Offer;
+
 use boardctrl::board_ctrl_server::{BoardCtrl, BoardCtrlServer};
 
 use clap::Parser;
@@ -178,6 +180,23 @@ impl BoardCtrl for ServiceManager {
 		};
 
 		Ok(Response::new(boardctrl::ReceivedNotice {}))
+	}
+
+	async fn publish_offer(&self, request: Request<boardctrl::SendOffer>) -> Result<Response<boardctrl::ReceivedOffer>, Status> {
+		let offer_message = request.into_inner().offer;
+
+		let service_keys = Keys::generate();
+
+		if let Ok(offer) = Offer::try_from(offer_message) {
+			let encoded_offer = offer.to_string();
+			if let Ok(kind32500_event) = EventBuilder::new_order_note(encoded_offer, &[]).to_event(&service_keys)
+			{
+				let mut board_send_lock = self.service_events_send.lock().unwrap();
+				board_send_lock.send(ClientEvents::OrderNote { order: kind32500_event });
+			}
+		}
+
+		Ok(Response::new(boardctrl::ReceivedOffer {}))
 	}
 }
 
