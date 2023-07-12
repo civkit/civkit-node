@@ -8,14 +8,19 @@
 // licenses.
 
 use boardctrl::board_ctrl_client::BoardCtrlClient;
-use boardctrl::{PingRequest, PongRequest, ShutdownRequest, ShutdownReply, SendNote, ReceivedNote, ListClientRequest, ListSubscriptionRequest, PeerConnectionRequest, DisconnectClientRequest, SendNotice, SendOffer};
+use boardctrl::{PingRequest, PongRequest, ShutdownRequest, ShutdownReply, SendNote, ReceivedNote, ListClientRequest, ListSubscriptionRequest, PeerConnectionRequest, DisconnectClientRequest, SendNotice, SendOffer, SendInvoice};
 
 use std::env;
 use std::process;
 
+use bitcoin_hashes::Hash;
+use bitcoin_hashes::sha256;
 use bitcoin::secp256k1::{PublicKey, Secp256k1, SecretKey};
 use bitcoin::KeyPair;
 use lightning::offers::offer::{Offer, OfferBuilder, Quantity};
+
+use lightning::ln::PaymentSecret;
+use lightning_invoice::{Currency, InvoiceBuilder};
 
 use lightning::util::ser::Writeable;
 
@@ -65,6 +70,9 @@ enum Command {
 		/// The BOLT12 offer to be announced
 		offer: String,
 	},
+	Publishinvoice {
+		invoice: String,
+	}
 }
 
 #[tokio::main]
@@ -154,6 +162,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 			});
 
 			let response = client.publish_offer(request).await?;
+		}
+		Command::Publishinvoice { invoice } => {
+			//TODO: tale real invoice from input
+			let secret_key = SecretKey::from_slice(&[42;32]).unwrap();
+	
+			let payment_hash = sha256::Hash::from_slice(&[0; 32][..]).unwrap();
+			let payment_secret = PaymentSecret([42u8;32]);
+
+			let invoice = InvoiceBuilder::new(Currency::Bitcoin)
+				.description("Here a trade invoice!".into())
+				.payment_hash(payment_hash)
+				.payment_secret(payment_secret)
+				.current_timestamp()
+				.min_final_cltv_expiry_delta(144)
+				.build_signed(|payment_hash| {
+					Secp256k1::new().sign_ecdsa_recoverable(payment_hash, &secret_key)
+				})
+				.unwrap();
+
+			let request = tonic::Request::new(SendInvoice {
+				invoice: invoice.to_string()
+			});
+
+			let response = client.publish_invoice(request).await?;
 		}
 	}
 	Ok(())

@@ -20,9 +20,9 @@ use tokio::sync::oneshot;
 pub enum ClientEvents {
 	TextNote { event: Event },
 	Server { cmd: ServerCmd },
+	OrderNote { order: Event },
 	EndOfStoredEvents { client_id: u64, sub_id: SubscriptionId },
 	RelayNotice { message: String },
-	OrderNote { order: Event },
 	SubscribedEvent { client_id: u64, sub_id: SubscriptionId, event: Event },
 }
 
