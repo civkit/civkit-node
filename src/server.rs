@@ -25,6 +25,8 @@ use civkit::events::{ClientEvents, EventsProvider, ServerCmd};
 
 use lightning::offers::offer::Offer;
 
+use lightning_invoice::Invoice;
+
 use boardctrl::board_ctrl_server::{BoardCtrl, BoardCtrlServer};
 
 use clap::Parser;
@@ -203,9 +205,12 @@ impl BoardCtrl for ServiceManager {
 		let invoice_message = request.into_inner().invoice;
 
 		let service_keys = Keys::generate();
+		//let invoice: Invoice = serde_json::from_str(&invoice_message).unwrap();
+		//let encoded_invoice = invoice.to_string();
+		if let Ok(kind32500_event) = EventBuilder::new_order_note(invoice_message, &[]).to_event(&service_keys)
 		{
-			let mut board_send_lock = self.service_events_send.lock().unwrap();
-			board_send_lock.send(ClientEvents::Invoice { });
+				let mut board_send_lock = self.service_events_send.lock().unwrap();
+				board_send_lock.send(ClientEvents::OrderNote { order: kind32500_event });
 		}
 
 		Ok(Response::new(boardctrl::ReceivedInvoice {}))

@@ -182,7 +182,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 				.unwrap();
 
 			let request = tonic::Request::new(SendInvoice {
-				invoice: invoice.to_string().as_bytes().to_vec()
+				invoice: invoice.to_string()
 			});
 
 			let response = client.publish_invoice(request).await?;

@@ -108,7 +108,7 @@ message ReceivedOffer {
 }
 
 message SendInvoice {
-	bytes invoice = 1;
+	string invoice = 1;
 }
 
 message ReceivedInvoice {
