@@ -10,10 +10,57 @@
 //! The componnent managing the reception of staking credentials and zap
 //! notes to ensure notes are not wasting CivKit node ressources.
 
-pub struct CredentialGateway {}
+use bitcoin::BlockHash;
+use bitcoin::blockdata::constants::genesis_block;
+use bitcoin::network::constants::Network;
+
+use bitcoin::secp256k1::Secp256k1;
+use bitcoin::secp256k1;
+
+use tokio::time::{sleep, Duration};
+
+#[derive(Copy, Clone, Debug)]
+struct GatewayConfig {
+	//accepted_asset_list: AssetProofFeatures
+
+	//supported_credentials_features: CredentialsFeatures
+
+	/// The number of elements of the credentials cache - Default data struct Merkle Tree
+	credentials_consumed_cache_size: u32,
+}
+
+impl Default for GatewayConfig {
+	fn default() -> GatewayConfig {
+		GatewayConfig {
+			credentials_consumed_cache_size: 10000000,
+		}
+	}
+}
+
+pub struct CredentialGateway {
+	genesis_hash: BlockHash,
+
+	default_config: GatewayConfig,
+
+	secp_ctx: Secp256k1<secp256k1::All>,
+}
 
 impl CredentialGateway {
 	pub fn new() -> Self {
-		CredentialGateway {}
+		let secp_ctx = Secp256k1::new();
+		//TODO: should be given a path to bitcoind to use the wallet
+		CredentialGateway {
+			genesis_hash: genesis_block(Network::Testnet).header.block_hash(),
+			default_config: GatewayConfig::default(),
+			secp_ctx,
+		}
+	}
+
+	pub async fn run(&mut self) {
+		loop {
+			sleep(Duration::from_millis(1000)).await;
+
+			println!("[CIVKITD] - CREDENTIALS: CredentialGateway ready for validation");
+		}
 	}
 }
