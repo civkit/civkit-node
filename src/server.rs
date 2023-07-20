@@ -218,6 +218,13 @@ impl BoardCtrl for ServiceManager {
 
 		Ok(Response::new(boardctrl::ReceivedInvoice {}))
 	}
+
+	async fn list_db_entries(&self, request: Request<boardctrl::ListDbEntriesRequest>) -> Result<Response<boardctrl::ListDbEntriesReply>, Status> {
+
+		println!("[CIVKITD] - CONTROL: listing DB entries !");
+
+		Ok(Response::new(boardctrl::ListDbEntriesReply {}))
+	}
 }
 
 #[derive(Parser, Debug)]
