@@ -18,6 +18,10 @@ path = "src/client.rs"
 name = "civkit-sample"
 path = "src/sample.rs"
 
+[[bin]]
+name = "parser"
+path = "src/parser.rs"
+
 [dependencies]
 futures-channel = "0.3.28"
 futures-util = "0.3.28"
@@ -36,11 +40,9 @@ clap = { version = "4.3.8", features = ["derive"] }
 serde_json = { version = "1.0" }
 toml = "0.5.8"
 serde_derive = "1.0"
-serde = "1.0"
+serde = "1.0.130"
 
 [build-dependencies]
 tonic-build = "0.9"
 
-[[bin]]
-name = "parser"
-path = "src/parser.rs"
+
