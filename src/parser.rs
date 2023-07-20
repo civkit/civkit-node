@@ -41,7 +41,7 @@ struct Civkitd {
 }
 
 fn main() {
-    let contents = fs::read_to_string("config.toml")
+    let contents = fs::read_to_string("./config.toml")
         .expect("Something went wrong reading the file");
 
     let config: Config = toml::from_str(&contents)
