@@ -10,7 +10,10 @@
 /// Main server of the CivKit Node, orchestrate all the components.
 
 mod boardmanager;
+mod config;
 
+use std::fs;
+use crate::config::Config;
 use crate::boardmanager::ServiceManager;
 use civkit::clienthandler::{NostrClient, ClientHandler};
 use civkit::anchormanager::AnchorManager;
@@ -230,8 +233,15 @@ struct Cli {
 	cli_port: String,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> 
-{
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let contents = fs::read_to_string("./config.toml")
+        .expect("Something went wrong reading the file");
+
+    let config: Config = toml::from_str(&contents)
+        .expect("Could not deserialize the config file");
+
+    println!("{:#?}", config);
+
 	let cli = Cli::parse();
 	println!("[CIVKITD] - INIT: CivKit node starting up...");
 	//TODO add a Logger interface
@@ -346,3 +356,4 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     	Ok(())
 }
+
