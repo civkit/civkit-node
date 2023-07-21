@@ -38,5 +38,6 @@ pub struct Civkitd {
     pub noise_port: i32,
     pub nostr_port: i32,
     pub cli_port: i32,
+    pub clientmustpaypublication: i32,
 }
 

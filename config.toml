@@ -19,3 +19,4 @@ network = "testnet"
 noise_port = 9735
 nostr_port = 9736
 cli_port = 9737
+clientmustpaypublication = 1
