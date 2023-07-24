@@ -34,6 +34,11 @@ nostr = { git = "https://github.com/civkit/nostr.git", branch = "civkit-branch" 
 url = "2.4.0"
 clap = { version = "4.3.8", features = ["derive"] }
 serde_json = { version = "1.0" }
+toml = "0.5.8"
+serde_derive = "1.0"
+serde = "1.0.130"
 
 [build-dependencies]
 tonic-build = "0.9"
+
+
