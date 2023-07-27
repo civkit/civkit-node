@@ -13,6 +13,7 @@ use bitcoin::secp256k1;
 use bitcoin::secp256k1::SecretKey;
 use bitcoin::secp256k1::Secp256k1;
 
+
 use nostr::{RelayMessage, Event, ClientMessage, SubscriptionId, Filter};
 use nostr::key::XOnlyPublicKey;
 
@@ -243,6 +244,15 @@ impl ClientHandler {
 							match outgoing_send.send(serialized_message.into_bytes()) {
 								Ok(_) => {},
 								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending notice"); },
+							}
+						},
+						ClientEvents::OrderNote { ref order } => {
+							let random_id = SubscriptionId::generate();
+							let relay_message = RelayMessage::new_event(random_id, order.clone());
+							let serialized_message = relay_message.as_json();
+							match outgoing_send.send(serialized_message.into_bytes()) {
+								Ok(_) => {},
+								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending order"); }
 							}
 						},
 						_ => {}

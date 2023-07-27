@@ -106,6 +106,31 @@ Connecting to a BOLT8 peer on local.
 [CIVKITD] - NET: inbound noise connection !
 ```
 
+Publishing a trade order (BOLT11 version).
+
+```
+./civkitd
+
+./civkit-cli publishinvoice lnbc2500u1pvjluezsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpu9qrsgquk0rl77nj30yxdy8j9vdx85fkpmdla2087ne0xh8nhedh8w27kyke0lp53ut353s06fv3qfegext0eh0ymjpf39tuven09sam30g4vgpfna3rh
+
+./civkit-sample
+
+/* On logs of civkitd */
+[CIVKITD] - INIT: CivKit node starting up...
+[CIVKITD] - INIT: noise port 9735 nostr port 50021 cli_port 50031
+[CIVKITD] - NET: ready to listen tcp connection for clients !
+[CIVKITD] - NET: receive a tcp connection !
+[CIVKITD] - NET: incoming tcp Connection from :[::1]:50911
+[CIVKITD] - NET: websocket established: [::1]:50911
+[CIVKITD] - PROCESSING: received an event from service manager
+[CIVKITD] - NOSTR: sending event for client 1
+
+/* On logs of civkit-sample */
+Civkit sample startup successful. Enter "help" to view available commands
+> 
+[EVENT] new trade offer:  lnbc1pj2aey9dpzfpjhyefqvys8gunpv3jjq6twwehkjcm9yypp5qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsp59g4z52329g4z52329g4z52329g4z52329g4z52329g4z52329g4q9qrsgqcqzysk7er2zn07fwp0drlja8lf9lrre28qutvkqg4mrt8aa3y7kr33qhyfp903uyhtzlngv7a0yyg7kmx9alvejzk970p7834djwzxz60eggqt6upps
+```
+
 Development Process
 -------------------
 

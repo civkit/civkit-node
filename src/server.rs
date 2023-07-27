@@ -10,7 +10,10 @@
 /// Main server of the CivKit Node, orchestrate all the components.
 
 mod boardmanager;
+mod config;
 
+use std::fs;
+use crate::config::Config;
 use crate::boardmanager::ServiceManager;
 use civkit::clienthandler::{NostrClient, ClientHandler};
 use civkit::anchormanager::AnchorManager;
@@ -22,6 +25,10 @@ use civkit::peerhandler::{NoiseGateway, PeerInfo};
 use civkit::oniongateway::OnionBox;
 
 use civkit::events::{ClientEvents, EventsProvider, ServerCmd};
+
+use lightning::offers::offer::Offer;
+
+use lightning_invoice::Invoice;
 
 use boardctrl::board_ctrl_server::{BoardCtrl, BoardCtrlServer};
 
@@ -179,6 +186,38 @@ impl BoardCtrl for ServiceManager {
 
 		Ok(Response::new(boardctrl::ReceivedNotice {}))
 	}
+
+	async fn publish_offer(&self, request: Request<boardctrl::SendOffer>) -> Result<Response<boardctrl::ReceivedOffer>, Status> {
+		let offer_message = request.into_inner().offer;
+
+		let service_keys = Keys::generate();
+
+		if let Ok(offer) = Offer::try_from(offer_message) {
+			let encoded_offer = offer.to_string();
+			if let Ok(kind32500_event) = EventBuilder::new_order_note(encoded_offer, &[]).to_event(&service_keys)
+			{
+				let mut board_send_lock = self.service_events_send.lock().unwrap();
+				board_send_lock.send(ClientEvents::OrderNote { order: kind32500_event });
+			}
+		}
+
+		Ok(Response::new(boardctrl::ReceivedOffer {}))
+	}
+
+	async fn publish_invoice(&self, request: Request<boardctrl::SendInvoice>) -> Result<Response<boardctrl::ReceivedInvoice>, Status> {
+		let invoice_message = request.into_inner().invoice;
+
+		let service_keys = Keys::generate();
+		//let invoice: Invoice = serde_json::from_str(&invoice_message).unwrap();
+		//let encoded_invoice = invoice.to_string();
+		if let Ok(kind32500_event) = EventBuilder::new_order_note(invoice_message, &[]).to_event(&service_keys)
+		{
+				let mut board_send_lock = self.service_events_send.lock().unwrap();
+				board_send_lock.send(ClientEvents::OrderNote { order: kind32500_event });
+		}
+
+		Ok(Response::new(boardctrl::ReceivedInvoice {}))
+	}
 }
 
 #[derive(Parser, Debug)]
@@ -194,8 +233,15 @@ struct Cli {
 	cli_port: String,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> 
-{
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let contents = fs::read_to_string("./config.toml")
+        .expect("Something went wrong reading the file");
+
+    let config: Config = toml::from_str(&contents)
+        .expect("Could not deserialize the config file");
+
+    println!("{:#?}", config);
+
 	let cli = Cli::parse();
 	println!("[CIVKITD] - INIT: CivKit node starting up...");
 	//TODO add a Logger interface
@@ -310,3 +356,4 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     	Ok(())
 }
+
