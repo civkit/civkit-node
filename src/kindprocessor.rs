@@ -9,16 +9,33 @@
 
 //! An interface to sanitize and enforce service policy on the received notes.
 
+use crate::nostr_db::DbRequest;
+use crate::nostr_db::{write_new_subscription_db, write_new_event_db, print_events_db};
+
 use std::sync::Mutex;
+
+use tokio::sync::mpsc;
+use tokio::sync::Mutex as TokioMutex;
+use tokio::time::{sleep, Duration};
 
 pub struct NoteProcessor {
 	note_counters: Mutex<u64>,
+	current_height: u64,
+
+	receive_db_requests: TokioMutex<mpsc::UnboundedReceiver<DbRequest>>,
+
+	receive_db_requests_manager: TokioMutex<mpsc::UnboundedReceiver<DbRequest>>,
 }
 
 impl NoteProcessor {
-	pub fn new() -> Self {
+	pub fn new(receive_db_requests: mpsc::UnboundedReceiver<DbRequest>, receive_db_requests_manager: mpsc::UnboundedReceiver<DbRequest>) -> Self {
 		NoteProcessor {
 			note_counters: Mutex::new(0),
+			current_height: 0,
+
+			receive_db_requests: TokioMutex::new(receive_db_requests),
+
+			receive_db_requests_manager: TokioMutex::new(receive_db_requests_manager),
 		}
 	}
 
@@ -38,5 +55,36 @@ impl NoteProcessor {
 			notes = *note_counters_lock;
 		}
 		return notes;
+	}
+
+	pub async fn run(&mut self) {
+		loop {
+			sleep(Duration::from_millis(1000)).await;
+
+			{
+				let mut receive_db_requests_lock = self.receive_db_requests.lock();
+				if let Ok(db_request) = receive_db_requests_lock.await.try_recv() {
+					match db_request {
+						DbRequest::WriteEvent(ev) => { write_new_event_db(ev).await; },
+						DbRequest::WriteSub(ns) => { write_new_subscription_db(ns); },
+						_ => {},
+					}
+					println!("[CIVKITD] - NOTE PROCESSING: Note processor received DB requests");	
+				}
+			}
+
+			{
+				let mut receive_db_requests_manager_lock = self.receive_db_requests_manager.lock();
+				if let Ok(db_request) = receive_db_requests_manager_lock.await.try_recv() {
+					match db_request {
+						DbRequest::DumpEvents => { print_events_db().await; },
+						_ => {},
+					}
+					println!("[CIVKITD] - NOTE PROCESSING: Note processor received DB requests from ServiceManager");
+				}
+			}
+
+			//TODO: receive requests from server command
+		}
 	}
 }
