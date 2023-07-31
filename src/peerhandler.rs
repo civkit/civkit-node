@@ -12,10 +12,14 @@
 use bitcoin::secp256k1::{SecretKey, PublicKey};
 use bitcoin::secp256k1::Secp256k1;
 
+use crate::NostrPeer;
+
 use lightning::sign::{NodeSigner, KeysManager};
 use lightning::ln::peer_handler::{PeerManager, MessageHandler, IgnoringMessageHandler, ErroringMessageHandler, SocketDescriptor as LnSocketTrait, CustomMessageHandler};
 use lightning::ln::msgs::{ChannelMessageHandler, RoutingMessageHandler, OnionMessageHandler};
 use lightning::util::logger::{Logger, Record};
+
+use crate::nostr_db::log_new_peer_db;
 
 use lightning_net_tokio::SocketDescriptor;
 
@@ -102,6 +106,13 @@ impl NoiseGateway {
 				let peer_addr = format!("[::1]:{}", local_port).parse().unwrap();
 				println!("[CIVKITD] - NOISE: opening outgoing noise connection!");
 				lightning_net_tokio::connect_outbound(Arc::clone(&peer_mngr), pubkey, peer_addr).await;
+
+				//TODO: the peer key should be read from the Noise connection
+				let secp_ctx = Secp256k1::new();
+				let seckey = SecretKey::from_slice(&[42; 32]).unwrap();
+				let pubkey = PublicKey::from_secret_key(&secp_ctx, &seckey);
+				let nostr_peer = NostrPeer::new(pubkey);
+				log_new_peer_db(nostr_peer);
 			}
 		}
 	}

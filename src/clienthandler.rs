@@ -13,11 +13,12 @@ use bitcoin::secp256k1;
 use bitcoin::secp256k1::SecretKey;
 use bitcoin::secp256k1::Secp256k1;
 
-
 use nostr::{RelayMessage, Event, ClientMessage, SubscriptionId, Filter};
 use nostr::key::XOnlyPublicKey;
 
+use crate::{events, NostrSub};
 use crate::events::{ClientEvents, EventsProvider, ServerCmd};
+use crate::nostr_db::{log_new_event_db, log_new_subscription_db};
 
 use futures_util::{future, pin_mut, TryStreamExt, StreamExt, SinkExt};
 
@@ -78,29 +79,12 @@ impl NostrClient {
 	}
 }
 
-struct NostrSub {
-	our_side_id: u64,
-	id: SubscriptionId,
-	filters: Vec<Filter>,
-}
+//pub(crate) struct NostrSub {
+//	our_side_id: u64,
+//	id: SubscriptionId,
+//	filters: Vec<Filter>,
+//}
 
-impl NostrSub {
-	fn new(our_side_id: u64, id: SubscriptionId, filters: Vec<Filter>) -> Self {
-		NostrSub {
-			our_side_id,
-			id,
-			filters,
-		}
-	}
-
-	fn is_our_id(&self, id: &SubscriptionId) -> bool {
-		self.id == *id
-	}
-
-	fn get_filters(&self) -> &Vec<Filter> {
-		&self.filters
-	}
-}
 
 const MAGIC_SERVER_PAYLOAD: [u8; 4] = [0x27, 0x27, 0x27, 0x27];
 
@@ -354,7 +338,11 @@ impl ClientHandler {
 										nostr_client.add_pubkey(msg.pubkey.clone());
 									}
 								}
+								let msg_2 = msg.clone();
 								self.filter_events(*msg).await;
+								//TODO: we should link our filtering policy to our db storing,
+								//otherwise this is a severe DoS vector
+								log_new_event_db(*msg_2);
 							},
 							ClientMessage::Req { subscription_id, filters } => {
 								self.subscriptions_counter += 1;
@@ -368,7 +356,9 @@ impl ClientHandler {
 									}
 								}
 								let nostr_sub = NostrSub::new(our_side_id, subscription_id.clone(), filters);
+								let nostr_sub2 = nostr_sub.clone();
 								self.subscriptions.insert(our_side_id, nostr_sub);
+								log_new_subscription_db(nostr_sub2);
 								//TODO: replay stored events when there is a store
 								new_pending_events.push(ClientEvents::EndOfStoredEvents { client_id: id, sub_id: subscription_id });
 								println!("[CIVKITD] - NOSTR: New subscription id {}", our_side_id);
