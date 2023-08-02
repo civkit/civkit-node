@@ -256,9 +256,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Open a log file for writing
     let mut log_file = File::create("../../config_parsing.log")?;
 
-    // Write the parsed configuration to the log file
-    writeln!(log_file, "{:#?}", config)?;
-
+    // Attempt to deserialize the config file
+    let config: Result<Config, _> = toml::from_str(&contents);
+    match config {
+        Ok(config) => {
+            // Continue with the rest of your code
+            println!("{:#?}", config);
+            // Write the parsed configuration to the log file
+            writeln!(log_file, "{:#?}", config)?;
+        },
+        Err(err) => {
+            // Log the error to the file
+            writeln!(log_file, "Could not deserialize the config file: {:?}", err)?;
+            // Optionally, you can also print the error to stderr
+            eprintln!("Could not deserialize the config file: {:?}", err);
+            // Handle the error as appropriate for your application
+            return Err(err.into());
+        }
+    }
 	let cli = Cli::parse();
 	println!("[CIVKITD] - INIT: CivKit node starting up...");
 	//TODO add a Logger interface
