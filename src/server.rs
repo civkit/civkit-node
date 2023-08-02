@@ -41,6 +41,9 @@ use std::net::SocketAddr;
 use std::process;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::fs::File;
+use std::io::Write;
+
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
@@ -241,13 +244,20 @@ struct Cli {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let contents = fs::read_to_string("./config.toml")
+    let contents = fs::read_to_string("../../config.toml")
         .expect("Something went wrong reading the file");
 
     let config: Config = toml::from_str(&contents)
         .expect("Could not deserialize the config file");
 
     println!("{:#?}", config);
+
+	
+    // Open a log file for writing
+    let mut log_file = File::create("../../civkitd_config_parsing.log")?;
+
+    // Write the parsed configuration to the log file
+    writeln!(log_file, "{:#?}", config)?;
 
 	let cli = Cli::parse();
 	println!("[CIVKITD] - INIT: CivKit node starting up...");
