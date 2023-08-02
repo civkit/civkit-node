@@ -249,7 +249,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match contents {
         Ok(contents) => {
             // Open a log file for writing
-            let mut log_file = File::create("../../config_parsing.log")?;
+            let mut log_file = File::create("../../debug.log")?;
 
             // Attempt to deserialize the config file
             let config: Result<Config, _> = toml::from_str(&contents);
@@ -262,8 +262,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Err(err) => {
                     // Log the error to the file
                     writeln!(log_file, "Could not deserialize the config file: {:?}", err)?;
-                    // Print the error to stderr
-                    eprintln!("Could not deserialize the config file: {:?}", err);
                     // Handle the error 
                     return Err(err.into());
                 }
@@ -271,10 +269,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         Err(err) => {
             // Log the error to the file
-            let mut log_file = File::create("../../config_parsing.log")?;
+            let mut log_file = File::create("../../debug.log")?;
             writeln!(log_file, "Something went wrong reading the file: {:?}", err)?;
-            //Print the error to stderr
-            eprintln!("Something went wrong reading the file: {:?}", err);
             // Handle the error 
             return Err(err.into());
         }
