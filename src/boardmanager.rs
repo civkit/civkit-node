@@ -18,10 +18,10 @@ use bitcoin::secp256k1::{SecretKey, PublicKey};
 use bitcoin::secp256k1::Secp256k1;
 use bitcoin::secp256k1;
 
+use civkit::nostr_db::DbRequest;
 use civkit::anchormanager::AnchorManager;
 use civkit::credentialgateway::CredentialGateway;
 use civkit::events::ClientEvents;
-use civkit::kindprocessor::NoteProcessor;
 use civkit::nodesigner::NodeSigner;
 use civkit::peerhandler::PeerInfo;
 
@@ -38,12 +38,13 @@ pub struct ServiceManager
 
 	credential_gateway: Arc<CredentialGateway>,
 	//TODO: abstract ServiceProcessor, ServiceSigner and AnchorManager in its own Service component ?
-	pub note_processor: Arc<NoteProcessor>,
 	node_signer: Arc<NodeSigner>,
 	anchor_manager: Arc<AnchorManager>,
 
 	pub service_events_send: Mutex<mpsc::UnboundedSender<ClientEvents>>,
 	pub service_peers_send: Mutex<mpsc::UnboundedSender<PeerInfo>>,
+
+	pub send_db_request: Mutex<mpsc::UnboundedSender<DbRequest>>,
 
 	our_service_pubkey: PublicKey,
 	secp_ctx: Secp256k1<secp256k1::All>,
@@ -51,23 +52,19 @@ pub struct ServiceManager
 
 impl ServiceManager
 {
-	pub fn new(credential_gateway: Arc<CredentialGateway>, node_signer: Arc<NodeSigner>, anchor_manager: Arc<AnchorManager>, note_processor: Arc<NoteProcessor>, board_events_send: mpsc::UnboundedSender<ClientEvents>, board_peers_send: mpsc::UnboundedSender<PeerInfo>) -> Self {
+	pub fn new(credential_gateway: Arc<CredentialGateway>, node_signer: Arc<NodeSigner>, anchor_manager: Arc<AnchorManager>, board_events_send: mpsc::UnboundedSender<ClientEvents>, board_peers_send: mpsc::UnboundedSender<PeerInfo>, send_db_request: mpsc::UnboundedSender<DbRequest>) -> Self {
 		let secp_ctx = Secp256k1::new();
 		let pubkey = PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[42;32]).unwrap());
 		ServiceManager {
 			genesis_hash: genesis_block(Network::Testnet).header.block_hash(),
 			credential_gateway,
-			note_processor,
 			anchor_manager,
 			node_signer,
 			service_events_send: Mutex::new(board_events_send),
 			service_peers_send: Mutex::new(board_peers_send),
+			send_db_request: Mutex::new(send_db_request),
 			our_service_pubkey: pubkey,
 			secp_ctx,
 		}
-	}
-
-	pub fn note_stats(&self) -> u64 {
-		self.note_processor.note_stats()
 	}
 }

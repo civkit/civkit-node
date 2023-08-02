@@ -15,6 +15,7 @@ mod config;
 use std::fs;
 use crate::config::Config;
 use crate::boardmanager::ServiceManager;
+use civkit::nostr_db::DbRequest;
 use civkit::clienthandler::{NostrClient, ClientHandler};
 use civkit::anchormanager::AnchorManager;
 use civkit::credentialgateway::CredentialGateway;
@@ -161,7 +162,9 @@ impl BoardCtrl for ServiceManager {
 
 	async fn status_handle(&self, request: Request<boardctrl::BoardStatusRequest>) -> Result<Response<boardctrl::BoardStatusReply>, Status> {
 
-		let notes = self.note_stats();
+		//TODO give a mspc communication channel between ServiceManager and NoteProcessor
+		let notes = 0;
+		//let notes = self.note_stats();
 
 		let board_status = boardctrl::BoardStatusReply {
 			offers: notes,
@@ -219,11 +222,16 @@ impl BoardCtrl for ServiceManager {
 		Ok(Response::new(boardctrl::ReceivedInvoice {}))
 	}
 
-	async fn list_db_entries(&self, request: Request<boardctrl::ListDbEntriesRequest>) -> Result<Response<boardctrl::ListDbEntriesReply>, Status> {
+	async fn list_db_events(&self, request: Request<boardctrl::ListDbEventsRequest>) -> Result<Response<boardctrl::ListDbEventsReply>, Status> {
 
-		println!("[CIVKITD] - CONTROL: listing DB entries !");
+		println!("[CIVKITD] - CONTROL: listing DB event !");
 
-		Ok(Response::new(boardctrl::ListDbEntriesReply {}))
+		{
+			let mut send_db_request_lock = self.send_db_request.lock().unwrap();
+			send_db_request_lock.send(DbRequest::DumpEvents);
+		}
+
+		Ok(Response::new(boardctrl::ListDbEventsReply {}))
 	}
 }
 
@@ -266,6 +274,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// We initialize the communication channels between the nostr tcp listener and ClientHandler.
 	let (socket_connector, request_receive) = mpsc::unbounded_channel::<(TcpStream, SocketAddr)>();
 
+	// We initialize the communication channels between the NoteProcessor and ClientHandler.
+	let (handler_send_dbrequests, processor_receive_dbrequests) = mpsc::unbounded_channel::<(DbRequest)>();
+
+	// We initialize the communication channels between the NoteProcessor and ServiceManager.
+	let (manager_send_dbrequests, receive_dbrequests_manager) = mpsc::unbounded_channel::<(DbRequest)>();
+
 	// The onion message handler...quite empty for now.
 	let onion_box = OnionBox::new();
 
@@ -276,7 +290,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let credential_gateway = Arc::new(CredentialGateway::new());
 
 	// The note or service provider...quite empty for now.
-	let note_processor = Arc::new(NoteProcessor::new());
+	let mut note_processor = NoteProcessor::new(processor_receive_dbrequests, receive_dbrequests_manager);
 
 	// The service provider signer...quite empty for now.
 	let node_signer = Arc::new(NodeSigner::new());
@@ -285,10 +299,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let anchor_manager = Arc::new(AnchorManager::new());
 
 	// Main handler of Nostr connections.
-	let mut client_handler = ClientHandler::new(handler_receive, request_receive);
+	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests);
 
 	// Main handler of services provision.
-	let board_manager = ServiceManager::new(credential_gateway, node_signer, anchor_manager, note_processor, board_events_send, board_peer_send);
+	let board_manager = ServiceManager::new(credential_gateway, node_signer, anchor_manager, board_events_send, board_peer_send, manager_send_dbrequests);
 
 	let addr = format!("[::1]:{}", cli.cli_port).parse()?;
 
@@ -317,6 +331,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// We start the onion box for received onions.
 	tokio::spawn(async move {
 		onion_box.run().await;
+	});
+
+	// We start the note processor for messages.
+	tokio::spawn(async move {
+		note_processor.run().await;
 	});
 
 	// We start the noise gateway for BOLT8 peers.
