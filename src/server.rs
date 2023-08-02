@@ -254,7 +254,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	
     // Open a log file for writing
-    let mut log_file = File::create("../../civkitd_config_parsing.log")?;
+    let mut log_file = File::create("../../config_parsing.log")?;
 
     // Write the parsed configuration to the log file
     writeln!(log_file, "{:#?}", config)?;
