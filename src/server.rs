@@ -244,36 +244,43 @@ struct Cli {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let contents = fs::read_to_string("../../config.toml")
-        .expect("Something went wrong reading the file");
+    // Attempt to read the contents of the config file
+    let contents = fs::read_to_string("../../config.toml");
+    match contents {
+        Ok(contents) => {
+            // Open a log file for writing
+            let mut log_file = File::create("../../config_parsing.log")?;
 
-    let config: Config = toml::from_str(&contents)
-        .expect("Could not deserialize the config file");
-
-    println!("{:#?}", config);
-
-	
-    // Open a log file for writing
-    let mut log_file = File::create("../../config_parsing.log")?;
-
-    // Attempt to deserialize the config file
-    let config: Result<Config, _> = toml::from_str(&contents);
-    match config {
-        Ok(config) => {
-            // Continue with the rest of your code
-            println!("{:#?}", config);
-            // Write the parsed configuration to the log file
-            writeln!(log_file, "{:#?}", config)?;
+            // Attempt to deserialize the config file
+            let config: Result<Config, _> = toml::from_str(&contents);
+            match config {
+                Ok(config) => {
+                    // Continue with the rest of your code
+                    println!("{:#?}", config);
+                    // Write the parsed configuration to the log file
+                    writeln!(log_file, "{:#?}", config)?;
+                },
+                Err(err) => {
+                    // Log the error to the file
+                    writeln!(log_file, "Could not deserialize the config file: {:?}", err)?;
+                    // Optionally, you can also print the error to stderr
+                    eprintln!("Could not deserialize the config file: {:?}", err);
+                    // Handle the error as appropriate for your application
+                    return Err(err.into());
+                }
+            }
         },
         Err(err) => {
             // Log the error to the file
-            writeln!(log_file, "Could not deserialize the config file: {:?}", err)?;
+            let mut log_file = File::create("../../config_parsing.log")?;
+            writeln!(log_file, "Something went wrong reading the file: {:?}", err)?;
             // Optionally, you can also print the error to stderr
-            eprintln!("Could not deserialize the config file: {:?}", err);
+            eprintln!("Something went wrong reading the file: {:?}", err);
             // Handle the error as appropriate for your application
             return Err(err.into());
         }
     }
+
 	let cli = Cli::parse();
 	println!("[CIVKITD] - INIT: CivKit node starting up...");
 	//TODO add a Logger interface
