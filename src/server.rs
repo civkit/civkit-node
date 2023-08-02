@@ -12,7 +12,7 @@
 mod boardmanager;
 mod config;
 
-use std::fs;
+
 use crate::config::Config;
 use crate::boardmanager::ServiceManager;
 use civkit::clienthandler::{NostrClient, ClientHandler};
@@ -43,7 +43,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::fs::File;
 use std::io::Write;
-
+use std::path::PathBuf;
+use std::fs;
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
@@ -53,6 +54,8 @@ use tokio::sync::{oneshot, mpsc};
 use tokio_tungstenite::WebSocketStream;
 
 use tonic::{transport::Server, Request, Response, Status};
+mod util;
+use util::get_default_data_dir;
 
 //TODO: rename boarctrl to something like relayctrl ?
 pub mod boardctrl {
@@ -244,12 +247,19 @@ struct Cli {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Get the default data directory
+    let data_dir = get_default_data_dir();
+    println!("Log file path: {:?}", data_dir.join("debug.log"));
+
+    // Create the necessary directories
+    fs::create_dir_all(&data_dir)?;
+
     // Attempt to read the contents of the config file
     let contents = fs::read_to_string("../../config.toml");
     match contents {
         Ok(contents) => {
             // Open a log file for writing
-            let mut log_file = File::create("../../debug.log")?;
+            let mut log_file = fs::File::create(data_dir.join("debug.log"))?;
 
             // Attempt to deserialize the config file
             let config: Result<Config, _> = toml::from_str(&contents);
@@ -262,20 +272,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Err(err) => {
                     // Log the error to the file
                     writeln!(log_file, "Could not deserialize the config file: {:?}", err)?;
-                    // Handle the error 
+                    // Handle the error
                     return Err(err.into());
                 }
             }
         },
         Err(err) => {
             // Log the error to the file
-            let mut log_file = File::create("../../debug.log")?;
+            let mut log_file = fs::File::create(data_dir.join("debug.log"))?;
             writeln!(log_file, "Something went wrong reading the file: {:?}", err)?;
-            // Handle the error 
+            // Handle the error
             return Err(err.into());
         }
     }
-
 	let cli = Cli::parse();
 	println!("[CIVKITD] - INIT: CivKit node starting up...");
 	//TODO add a Logger interface

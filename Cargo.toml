@@ -39,6 +39,7 @@ serde_derive = "1.0"
 serde = "1.0.130"
 rusqlite = "0.29.0"
 simplelog = "0.12.0"
+dirs = "3.0.2"
 
 [build-dependencies]
 tonic-build = "0.9"
