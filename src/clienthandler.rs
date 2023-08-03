@@ -16,6 +16,8 @@ use bitcoin::secp256k1::Secp256k1;
 use nostr::{RelayMessage, Event, ClientMessage, SubscriptionId, Filter};
 use nostr::key::XOnlyPublicKey;
 
+use crate::config::Config;
+
 use crate::{events, NostrSub};
 use crate::events::{ClientEvents, EventsProvider, ServerCmd};
 use crate::nostr_db::DbRequest;
@@ -38,6 +40,8 @@ use tokio_tungstenite::tungstenite::Message;
 
 /// Max number of subscriptions by connected clients.
 const MAX_SUBSCRIPTIONS: u64 = 100;
+
+//TODO: implement config's `maxclientconnections`
 
 #[derive(Debug, Clone)]
 pub struct NostrClient {
@@ -106,7 +110,9 @@ pub struct ClientHandler {
 
 	filtered_events: HashMap<SubscriptionId, Event>,
 
-	pending_events: Mutex<Vec<ClientEvents>>
+	pending_events: Mutex<Vec<ClientEvents>>,
+
+	config: Config
 }
 
 async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, outgoing_receive: mpsc::UnboundedSender<Vec<u8>>, mut incoming_send: mpsc::UnboundedReceiver<Vec<u8>>) {
@@ -151,7 +157,7 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, outgoing_rec
 }
 
 impl ClientHandler {
-	pub fn new(handler_receive: mpsc::UnboundedReceiver<ClientEvents>, connection_receive: mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>, send_db_requests: mpsc::UnboundedSender<DbRequest>) -> Self {
+	pub fn new(handler_receive: mpsc::UnboundedReceiver<ClientEvents>, connection_receive: mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>, send_db_requests: mpsc::UnboundedSender<DbRequest>, our_config: Config) -> Self {
 
 		let (outgoing_receive, incoming_receive) = mpsc::unbounded_channel::<Vec<u8>>();
 
@@ -173,6 +179,8 @@ impl ClientHandler {
 			filtered_events: HashMap::new(),
 
 			pending_events: Mutex::new(vec![]),
+
+			config: our_config
 		}
 	}
 
@@ -227,6 +235,7 @@ impl ClientHandler {
 							}
 						},
 						ClientEvents::RelayNotice { ref message } => {
+							//TODO: implement `requestcredential` announcement
 							let relay_message = RelayMessage::new_notice(message);
 							let serialized_message = relay_message.as_json();
 							match outgoing_send.send(serialized_message.into_bytes()) {

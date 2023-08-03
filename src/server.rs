@@ -13,9 +13,9 @@ mod boardmanager;
 mod config;
 
 use std::fs;
-use crate::config::Config;
 use crate::boardmanager::ServiceManager;
 use civkit::nostr_db::DbRequest;
+use civkit::config::Config;
 use civkit::clienthandler::{NostrClient, ClientHandler};
 use civkit::anchormanager::AnchorManager;
 use civkit::credentialgateway::CredentialGateway;
@@ -249,13 +249,11 @@ struct Cli {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let contents = fs::read_to_string("./config.toml")
-        .expect("Something went wrong reading the file");
+    	let contents = fs::read_to_string("./example-config.toml")
+        	.expect("Something went wrong reading the file");
 
-    let config: Config = toml::from_str(&contents)
-        .expect("Could not deserialize the config file");
-
-    println!("{:#?}", config);
+    	let config: Config = toml::from_str(&contents)
+        	.expect("Could not deserialize the config file");
 
 	let cli = Cli::parse();
 	println!("[CIVKITD] - INIT: CivKit node starting up...");
@@ -299,10 +297,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let anchor_manager = Arc::new(AnchorManager::new());
 
 	// Main handler of Nostr connections.
-	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests);
+	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests, config.clone());
 
 	// Main handler of services provision.
-	let board_manager = ServiceManager::new(credential_gateway, node_signer, anchor_manager, board_events_send, board_peer_send, manager_send_dbrequests);
+	let board_manager = ServiceManager::new(credential_gateway, node_signer, anchor_manager, board_events_send, board_peer_send, manager_send_dbrequests, config.clone());
 
 	let addr = format!("[::1]:{}", cli.cli_port).parse()?;
 
