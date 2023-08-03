@@ -18,7 +18,7 @@ service BoardCtrl {
 	rpc PublishNotice (SendNotice) returns (ReceivedNotice);
 	rpc PublishOffer (SendOffer) returns (ReceivedOffer);
 	rpc PublishInvoice (SendInvoice) returns (ReceivedInvoice);
-	rpc ListDbEntries (ListDbEntriesRequest) returns (ListDbEntriesReply);
+	rpc ListDbEvents (ListDbEventsRequest) returns (ListDbEventsReply);
 }
 
 message PingRequest {
@@ -115,8 +115,8 @@ message SendInvoice {
 message ReceivedInvoice {
 }
 
-message ListDbEntriesRequest {
+message ListDbEventsRequest {
 }
 
-message ListDbEntriesReply {
+message ListDbEventsReply {
 }

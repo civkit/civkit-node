@@ -16,9 +16,11 @@ use bitcoin::secp256k1::Secp256k1;
 use nostr::{RelayMessage, Event, ClientMessage, SubscriptionId, Filter};
 use nostr::key::XOnlyPublicKey;
 
+use crate::config::Config;
+
 use crate::{events, NostrSub};
 use crate::events::{ClientEvents, EventsProvider, ServerCmd};
-use crate::nostr_db::{log_new_event_db, log_new_subscription_db};
+use crate::nostr_db::DbRequest;
 
 use futures_util::{future, pin_mut, TryStreamExt, StreamExt, SinkExt};
 
@@ -38,6 +40,8 @@ use tokio_tungstenite::tungstenite::Message;
 
 /// Max number of subscriptions by connected clients.
 const MAX_SUBSCRIPTIONS: u64 = 100;
+
+//TODO: implement config's `maxclientconnections`
 
 #[derive(Debug, Clone)]
 pub struct NostrClient {
@@ -102,9 +106,13 @@ pub struct ClientHandler {
 	handler_receive: Mutex<mpsc::UnboundedReceiver<ClientEvents>>,
 	connection_receive: Mutex<mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>>,
 
+	send_db_requests: Mutex<mpsc::UnboundedSender<DbRequest>>,
+
 	filtered_events: HashMap<SubscriptionId, Event>,
 
-	pending_events: Mutex<Vec<ClientEvents>>
+	pending_events: Mutex<Vec<ClientEvents>>,
+
+	config: Config
 }
 
 async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, outgoing_receive: mpsc::UnboundedSender<Vec<u8>>, mut incoming_send: mpsc::UnboundedReceiver<Vec<u8>>) {
@@ -149,7 +157,7 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, outgoing_rec
 }
 
 impl ClientHandler {
-	pub fn new(handler_receive: mpsc::UnboundedReceiver<ClientEvents>, connection_receive: mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>) -> Self {
+	pub fn new(handler_receive: mpsc::UnboundedReceiver<ClientEvents>, connection_receive: mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>, send_db_requests: mpsc::UnboundedSender<DbRequest>, our_config: Config) -> Self {
 
 		let (outgoing_receive, incoming_receive) = mpsc::unbounded_channel::<Vec<u8>>();
 
@@ -166,9 +174,13 @@ impl ClientHandler {
 			handler_receive: Mutex::new(handler_receive),
 			connection_receive: Mutex::new(connection_receive),
 
+			send_db_requests: Mutex::new(send_db_requests),
+
 			filtered_events: HashMap::new(),
 
 			pending_events: Mutex::new(vec![]),
+
+			config: our_config
 		}
 	}
 
@@ -223,6 +235,7 @@ impl ClientHandler {
 							}
 						},
 						ClientEvents::RelayNotice { ref message } => {
+							//TODO: implement `requestcredential` announcement
 							let relay_message = RelayMessage::new_notice(message);
 							let serialized_message = relay_message.as_json();
 							match outgoing_send.send(serialized_message.into_bytes()) {
@@ -325,6 +338,7 @@ impl ClientHandler {
 			}
 
 			let mut new_pending_events = Vec::new();
+			let mut events_write_db = Vec::new();
 			{
 				// If we have a new event, we'll fan out according to its types (event, subscription, close)
 				for (id, msg) in msg_queue {
@@ -342,7 +356,8 @@ impl ClientHandler {
 								self.filter_events(*msg).await;
 								//TODO: we should link our filtering policy to our db storing,
 								//otherwise this is a severe DoS vector
-								log_new_event_db(*msg_2);
+								let db_request = DbRequest::WriteEvent(*msg_2);
+								events_write_db.push(db_request);
 							},
 							ClientMessage::Req { subscription_id, filters } => {
 								self.subscriptions_counter += 1;
@@ -358,10 +373,10 @@ impl ClientHandler {
 								let nostr_sub = NostrSub::new(our_side_id, subscription_id.clone(), filters);
 								let nostr_sub2 = nostr_sub.clone();
 								self.subscriptions.insert(our_side_id, nostr_sub);
-								log_new_subscription_db(nostr_sub2);
 								//TODO: replay stored events when there is a store
 								new_pending_events.push(ClientEvents::EndOfStoredEvents { client_id: id, sub_id: subscription_id });
-								println!("[CIVKITD] - NOSTR: New subscription id {}", our_side_id);
+								let db_request = DbRequest::DumpEvents;
+								events_write_db.push(db_request);
 							},
 							ClientMessage::Close(subscription_id) => {
 								//TODO: replace our_side_id by Sha256 of SubscriptionId
@@ -383,17 +398,25 @@ impl ClientHandler {
 			}
 
 			{
+				for ev in events_write_db {
+					let mut send_db_requests_lock = self.send_db_requests.lock();
+					send_db_requests_lock.await.send(ev);
+				}
+			}
+
+
+			{
 				let mut pending_events_lock = self.pending_events.lock();
 				pending_events_lock.await.append(&mut new_pending_events);
 			}
 		}
 	}
 
-	async fn filter_events(&mut self, event: Event) {
+	async fn filter_events(&mut self, event: Event) -> bool {
 
+		let mut match_result = false;
 		for (our_side_id, sub) in self.subscriptions.iter() {
 			let filters = sub.get_filters();
-			let mut match_result = false;
 			for filter in filters {
 				if let Some(ref kinds) = filter.kinds {
 					for kind in kinds.iter() {
@@ -419,5 +442,7 @@ impl ClientHandler {
 				pending_events_lock.await.append(&mut clients_to_dispatch);
 			}
 		}
+
+		match_result
 	}
 }

@@ -11,7 +11,7 @@ use bitcoin::secp256k1::PublicKey;
 
 use nostr::{SubscriptionId, Filter};
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct NostrSub {
 	our_side_id: u64,
 	id: SubscriptionId,
@@ -36,7 +36,7 @@ impl NostrSub {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct NostrPeer {
 	peer_pubkey: PublicKey,
 }

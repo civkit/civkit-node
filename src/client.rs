@@ -8,7 +8,7 @@
 // licenses.
 
 use boardctrl::board_ctrl_client::BoardCtrlClient;
-use boardctrl::{PingRequest, PongRequest, ShutdownRequest, ShutdownReply, SendNote, ReceivedNote, ListClientRequest, ListSubscriptionRequest, PeerConnectionRequest, DisconnectClientRequest, SendNotice, SendOffer, SendInvoice, ListDbEntriesRequest};
+use boardctrl::{PingRequest, PongRequest, ShutdownRequest, ShutdownReply, SendNote, ReceivedNote, ListClientRequest, ListSubscriptionRequest, PeerConnectionRequest, DisconnectClientRequest, SendNotice, SendOffer, SendInvoice, ListDbEventsRequest};
 
 use std::env;
 use std::process;
@@ -74,7 +74,7 @@ enum Command {
 		invoice: String,
 	},
 	/// List DB entries
-	ListDbEntries
+	ListDbEvents
 }
 
 #[tokio::main]
@@ -189,10 +189,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 			let response = client.publish_invoice(request).await?;
 		}
-		Command::ListDbEntries => {
-			let request = tonic::Request::new(ListDbEntriesRequest {});
+		Command::ListDbEvents => {
+			let request = tonic::Request::new(ListDbEventsRequest {});
 
-			let _response = client.list_db_entries(request).await?;
+			let _response = client.list_db_events(request).await?;
 		}
 	}
 	Ok(())
