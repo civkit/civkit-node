@@ -14,7 +14,7 @@ mod config;
 
 
 
-use crate::config::Config;
+use crate::config::Config as LocalConfig;
 
 use std::fs;
 use crate::boardmanager::ServiceManager;
@@ -274,7 +274,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut log_file = fs::File::create(data_dir.join("debug.log"))?;
 
             // Attempt to deserialize the config file
-            let config: Result<Config, _> = toml::from_str(&contents);
+            let config: Result<LocalConfig, _> = toml::from_str(&contents);
             match config {
                 Ok(config) => {
                     println!("{:#?}", config);
