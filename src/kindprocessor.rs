@@ -10,7 +10,7 @@
 //! An interface to sanitize and enforce service policy on the received notes.
 
 use crate::nostr_db::DbRequest;
-use crate::nostr_db::{write_new_subscription_db, write_new_event_db, print_events_db};
+use crate::nostr_db::{write_new_subscription_db, write_new_event_db, write_new_client_db, print_events_db, print_clients_db};
 
 use std::sync::Mutex;
 
@@ -67,6 +67,7 @@ impl NoteProcessor {
 					match db_request {
 						DbRequest::WriteEvent(ev) => { write_new_event_db(ev).await; },
 						DbRequest::WriteSub(ns) => { write_new_subscription_db(ns); },
+						DbRequest::WriteClient(ct) => { write_new_client_db(ct).await; },
 						_ => {},
 					}
 					println!("[CIVKITD] - NOTE PROCESSING: Note processor received DB requests");	
@@ -78,6 +79,7 @@ impl NoteProcessor {
 				if let Ok(db_request) = receive_db_requests_manager_lock.await.try_recv() {
 					match db_request {
 						DbRequest::DumpEvents => { print_events_db().await; },
+						DbRequest::DumpClients => { print_clients_db().await; },
 						_ => {},
 					}
 					println!("[CIVKITD] - NOTE PROCESSING: Note processor received DB requests from ServiceManager");

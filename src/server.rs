@@ -19,12 +19,13 @@ use std::fs;
 use crate::boardmanager::ServiceManager;
 use civkit::nostr_db::DbRequest;
 use civkit::config::Config;
-use civkit::clienthandler::{NostrClient, ClientHandler};
+use civkit::clienthandler::ClientHandler;
 use civkit::anchormanager::AnchorManager;
 use civkit::credentialgateway::CredentialGateway;
 use civkit::kindprocessor::NoteProcessor;
 use civkit::nodesigner::NodeSigner;
 use civkit::peerhandler::{NoiseGateway, PeerInfo};
+use civkit::NostrClient;
 
 use civkit::oniongateway::OnionBox;
 
@@ -235,6 +236,18 @@ impl BoardCtrl for ServiceManager {
 		}
 
 		Ok(Response::new(boardctrl::ListDbEventsReply {}))
+	}
+
+	async fn list_db_clients(&self, request: Request<boardctrl::ListDbClientsRequest>) -> Result<Response<boardctrl::ListDbClientsReply>, Status> {
+
+		println!("[CIVKITD] - CONTROL: listing DB clients !");
+
+		{
+			let mut send_db_request_lock = self.send_db_request.lock().unwrap();
+			send_db_request_lock.send(DbRequest::DumpClients);
+		}
+
+		Ok(Response::new(boardctrl::ListDbClientsReply {}))
 	}
 }
 

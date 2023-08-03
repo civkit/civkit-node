@@ -18,7 +18,7 @@ use nostr::key::XOnlyPublicKey;
 
 use crate::config::Config;
 
-use crate::{events, NostrSub};
+use crate::{events, NostrSub, NostrClient};
 use crate::events::{ClientEvents, EventsProvider, ServerCmd};
 use crate::nostr_db::DbRequest;
 
@@ -40,48 +40,6 @@ use tokio_tungstenite::tungstenite::Message;
 
 /// Max number of subscriptions by connected clients.
 const MAX_SUBSCRIPTIONS: u64 = 100;
-
-//TODO: implement config's `maxclientconnections`
-
-#[derive(Debug, Clone)]
-pub struct NostrClient {
-	//TODO: check we're using Schnorr not ECDSA
-	pub pubkey: Option<XOnlyPublicKey>,
-	pub client_id: u64,
-	pub associated_socket: SocketAddr,
-
-	pub subscriptions: HashMap<u64, ()>,
-}
-
-impl NostrClient {
-	fn new(client_id: u64, socket: SocketAddr) -> Self {
-		NostrClient {
-			pubkey: None,
-			client_id,
-			associated_socket: socket,
-			subscriptions: HashMap::new(),
-		}
-	}
-
-	fn has_pubkey(&self) -> bool {
-		self.pubkey.is_some()
-	}
-
-	fn add_pubkey(&mut self, pubkey: XOnlyPublicKey) {
-		self.pubkey = Some(pubkey);
-	}
-
-	fn add_sub(&mut self, sub_id: u64) -> bool {
-		if self.subscriptions.len() as u64 <= MAX_SUBSCRIPTIONS {
-			return self.subscriptions.insert(sub_id, ()).is_none();
-		}
-		false
-	}
-
-	fn has_sub(&self, sub_id: u64) -> bool {
-		self.subscriptions.get(&sub_id).is_some()
-	}
-}
 
 //pub(crate) struct NostrSub {
 //	our_side_id: u64,
@@ -311,10 +269,13 @@ impl ClientHandler {
 				}
 			}
 
+			let mut write_db = Vec::new();
+
 			if let Some((addr, outgoing_send, incoming_receive)) = socket_and_sender {
 				self.clients_counter += 1;
 				let client_id = self.clients_counter;
 				let new_nostr_client = NostrClient::new(client_id as u64, addr);
+				let client_2 = new_nostr_client.clone();
 				self.clients.insert(client_id, new_nostr_client);
 				{
 					let mut map_send_lock = self.map_send.lock();
@@ -324,6 +285,8 @@ impl ClientHandler {
 					let mut map_receive_lock = self.map_receive.lock();
 					map_receive_lock.await.insert(client_id, incoming_receive);
 				}
+				let db_request = DbRequest::WriteClient(client_2);
+				write_db.push(db_request);
 			}
 
 			let mut msg_queue = Vec::new();
@@ -338,7 +301,6 @@ impl ClientHandler {
 			}
 
 			let mut new_pending_events = Vec::new();
-			let mut events_write_db = Vec::new();
 			{
 				// If we have a new event, we'll fan out according to its types (event, subscription, close)
 				for (id, msg) in msg_queue {
@@ -357,7 +319,7 @@ impl ClientHandler {
 								//TODO: we should link our filtering policy to our db storing,
 								//otherwise this is a severe DoS vector
 								let db_request = DbRequest::WriteEvent(*msg_2);
-								events_write_db.push(db_request);
+								write_db.push(db_request);
 							},
 							ClientMessage::Req { subscription_id, filters } => {
 								self.subscriptions_counter += 1;
@@ -366,7 +328,7 @@ impl ClientHandler {
 								if let Some(nostr_client) = self.clients.get_mut(&id) {
 									//TODO: NIP 01 : "Clients should not open more than one websocket to each relay. One channel can support an unlimited number of subscriptions, so clients should do that."
 									// Sanitize with keys ?
-									if !nostr_client.add_sub(our_side_id) {
+									if !nostr_client.add_sub(our_side_id, MAX_SUBSCRIPTIONS) {
 										println!("[CIVKITD] - NOSTR: subscription register failure");
 									}
 								}
@@ -375,8 +337,6 @@ impl ClientHandler {
 								self.subscriptions.insert(our_side_id, nostr_sub);
 								//TODO: replay stored events when there is a store
 								new_pending_events.push(ClientEvents::EndOfStoredEvents { client_id: id, sub_id: subscription_id });
-								let db_request = DbRequest::DumpEvents;
-								events_write_db.push(db_request);
 							},
 							ClientMessage::Close(subscription_id) => {
 								//TODO: replace our_side_id by Sha256 of SubscriptionId
@@ -398,7 +358,7 @@ impl ClientHandler {
 			}
 
 			{
-				for ev in events_write_db {
+				for ev in write_db {
 					let mut send_db_requests_lock = self.send_db_requests.lock();
 					send_db_requests_lock.await.send(ev);
 				}

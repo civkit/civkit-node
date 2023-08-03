@@ -10,7 +10,7 @@
 //! Internal events used to exchange information between ServiceManager and
 //! ClientHandler.
 
-use crate::clienthandler::NostrClient;
+use crate::NostrClient;
 
 use nostr::{Event, SubscriptionId};
 
