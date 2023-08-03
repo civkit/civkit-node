@@ -332,10 +332,11 @@ impl ClientHandler {
 										println!("[CIVKITD] - NOSTR: subscription register failure");
 									}
 								}
-								let nostr_sub = NostrSub::new(our_side_id, subscription_id.clone(), filters);
+								let nostr_sub = NostrSub::new(our_side_id, subscription_id.clone(), filters.clone());
 								let nostr_sub2 = nostr_sub.clone();
 								self.subscriptions.insert(our_side_id, nostr_sub);
-								//TODO: replay stored events when there is a store
+								let db_request = DbRequest::ReplayEvents { client_id: id, filters: filters };
+								write_db.push(db_request);
 								new_pending_events.push(ClientEvents::EndOfStoredEvents { client_id: id, sub_id: subscription_id });
 							},
 							ClientMessage::Close(subscription_id) => {

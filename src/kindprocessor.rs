@@ -61,6 +61,7 @@ impl NoteProcessor {
 		loop {
 			sleep(Duration::from_millis(1000)).await;
 
+			let mut replay_request = Vec::new();
 			{
 				let mut receive_db_requests_lock = self.receive_db_requests.lock();
 				if let Ok(db_request) = receive_db_requests_lock.await.try_recv() {
@@ -68,9 +69,10 @@ impl NoteProcessor {
 						DbRequest::WriteEvent(ev) => { write_new_event_db(ev).await; },
 						DbRequest::WriteSub(ns) => { write_new_subscription_db(ns); },
 						DbRequest::WriteClient(ct) => { write_new_client_db(ct).await; },
+						DbRequest::ReplayEvents { client_id, filters } => { replay_request.push((client_id, filters)); },
 						_ => {},
 					}
-					println!("[CIVKITD] - NOTE PROCESSING: Note processor received DB requests");	
+					println!("[CIVKITD] - NOTE PROCESSING: Note processor received DB requests");
 				}
 			}
 
@@ -86,7 +88,7 @@ impl NoteProcessor {
 				}
 			}
 
-			//TODO: receive requests from server command
+			//TODO: visitor on DB with query	
 		}
 	}
 }

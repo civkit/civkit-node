@@ -7,7 +7,7 @@
 // You may not use this file except in accordance with one or both of these
 // licenses.
 
-use nostr::Event;
+use nostr::{Event, Filter};
 
 use crate::{NostrSub, NostrPeer, NostrClient};
 
@@ -22,6 +22,7 @@ pub enum DbRequest {
 	WriteEvent(Event),
 	WriteSub(NostrSub),
 	WriteClient(NostrClient),
+	ReplayEvents { client_id: u64, filters: Vec<Filter> },
 	DumpEvents,
 	DumpClients,
 }
@@ -29,6 +30,7 @@ pub enum DbRequest {
 #[derive(Debug)]
 struct DbEvent {
 	id: i32,
+	kind: i32,
 	data: Option<Vec<u8>>,
 }
 
@@ -55,6 +57,7 @@ pub async fn write_new_event_db(event: Event) {
 
 		match conn.execute("CREATE TABLE event (
 			event_id	INTEGER PRIMARY KEY,
+			kind		INTEGER,
 			data		BLOB
 		)",
 		()) {
@@ -65,6 +68,7 @@ pub async fn write_new_event_db(event: Event) {
 		//TODO: add complete event
 		let event = DbEvent {
 			id: 0,
+			kind: 0,
 			data: None,
 		};
 
@@ -92,7 +96,8 @@ pub async fn print_events_db() {
 			let event_iter = stmt.query_map([], |row| {
 				Ok(DbEvent {
 					id: row.get(0)?,
-					data: row.get(1)?,
+					kind: row.get(1)?,
+					data: row.get(2)?,
 				})
 			}).unwrap();
 
@@ -197,6 +202,7 @@ pub async fn log_new_peer_db(peer: NostrPeer) {
 
 		let event = DbEvent {
 			id: 0,
+			kind: 0,
 			data: None,
 		};
 
