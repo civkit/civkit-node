@@ -267,7 +267,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .expect("Could not deserialize the config file");
 
     // Log the parsed configuration data
-    log::info!("Parsed configuration: {:?}", config);	
+    //log::info!("Parsed configuration: {:?}", config);	
 	let cli = Cli::parse();
 	
 	println!("[CIVKITD] - INIT: CivKit node starting up...");
