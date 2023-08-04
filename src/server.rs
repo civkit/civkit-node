@@ -11,7 +11,10 @@
 
 mod boardmanager;
 mod config;
+mod util;
 
+use crate::util::init_logger;
+use log;
 use std::fs;
 use crate::boardmanager::ServiceManager;
 use civkit::nostr_db::DbRequest;
@@ -248,14 +251,25 @@ struct Cli {
 	cli_port: String,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    	let contents = fs::read_to_string("./example-config.toml")
-        	.expect("Something went wrong reading the file");
+fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let data_dir = util::get_default_data_dir();
 
-    	let config: Config = toml::from_str(&contents)
-        	.expect("Could not deserialize the config file");
+    // Initialize the logger
+    let log_writer = util::init_logger(&data_dir)?;
 
+    // Initialize the logger and log the log file path
+    log::info!("Logging initialized. Log file located at: {:?}", data_dir.join("debug.log"));
+
+    let contents = fs::read_to_string("../../example-config.toml")
+        .expect("Something went wrong reading the file");
+
+    let config: Config = toml::from_str(&contents)
+        .expect("Could not deserialize the config file");
+
+    // Log the parsed configuration data
+    log::info!("Parsed configuration: {:?}", config);	
 	let cli = Cli::parse();
+	
 	println!("[CIVKITD] - INIT: CivKit node starting up...");
 	//TODO add a Logger interface
 
