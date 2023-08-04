@@ -264,7 +264,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .expect("Something went wrong reading the file");
 
     let config: Config = toml::from_str(&contents)
-        .expect("Could not deserialize the config file");
+        .expect("Could not deserialize the config file content");
 
     // Log the parsed configuration data
     //log::info!("Parsed configuration: {:?}", config);	
