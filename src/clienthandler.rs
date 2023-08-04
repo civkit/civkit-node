@@ -65,6 +65,7 @@ pub struct ClientHandler {
 	connection_receive: Mutex<mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>>,
 
 	send_db_requests: Mutex<mpsc::UnboundedSender<DbRequest>>,
+	handler_receive_db_result: Mutex<mpsc::UnboundedReceiver<ClientEvents>>,
 
 	filtered_events: HashMap<SubscriptionId, Event>,
 
@@ -115,7 +116,7 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, outgoing_rec
 }
 
 impl ClientHandler {
-	pub fn new(handler_receive: mpsc::UnboundedReceiver<ClientEvents>, connection_receive: mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>, send_db_requests: mpsc::UnboundedSender<DbRequest>, our_config: Config) -> Self {
+	pub fn new(handler_receive: mpsc::UnboundedReceiver<ClientEvents>, connection_receive: mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>, send_db_requests: mpsc::UnboundedSender<DbRequest>, handler_receive_db_result: mpsc::UnboundedReceiver<ClientEvents>, our_config: Config) -> Self {
 
 		let (outgoing_receive, incoming_receive) = mpsc::unbounded_channel::<Vec<u8>>();
 
@@ -133,6 +134,7 @@ impl ClientHandler {
 			connection_receive: Mutex::new(connection_receive),
 
 			send_db_requests: Mutex::new(send_db_requests),
+			handler_receive_db_result: Mutex::new(handler_receive_db_result),
 
 			filtered_events: HashMap::new(),
 
@@ -146,7 +148,7 @@ impl ClientHandler {
 		loop {
 			sleep(Duration::from_millis(1000)).await;
 
-			let mut client_event = None;
+			let mut client_events = Vec::new();
 			{
 				// We receive an offer processed by the relay management utility, or any other
 				// service-side Nostr event.
@@ -172,12 +174,20 @@ impl ClientHandler {
 							},
 						}
 					} else {
-						client_event = Some(event)
-					}	
+						client_events.push(event);
+					}
 				}
 			}
 
-			if let Some(event) = client_event {
+			{
+				// We receive a result of a db query from the DB manager.
+				let mut handler_receive_db_result_lock = self.handler_receive_db_result.lock();
+				if let Ok(event) = handler_receive_db_result_lock.await.try_recv() {
+					client_events.push(event);
+				}
+			}
+
+			for event in client_events {
 				let mut map_send_lock = self.map_send.lock();
 
 				for (id, outgoing_send) in map_send_lock.await.iter() {
@@ -208,6 +218,26 @@ impl ClientHandler {
 							match outgoing_send.send(serialized_message.into_bytes()) {
 								Ok(_) => {},
 								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending order"); }
+							}
+						},
+						ClientEvents::StoredEvent { ref client_id,  ref events } => {
+							if id != client_id { continue }
+
+							//TODO: capture the subscription id
+							let random_id = SubscriptionId::generate();
+							for ev in events {
+								let relay_message = RelayMessage::new_event(random_id.clone(), ev.clone());
+								let serialized_message = relay_message.as_json();
+								match outgoing_send.send(serialized_message.into_bytes()) {
+									Ok(_) => {},
+									Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending stored events"); },
+								}
+							}
+							let relay_message = RelayMessage::new_eose(random_id.clone());
+							let serialized_message = relay_message.as_json();
+							match outgoing_send.send(serialized_message.into_bytes()) {
+								Ok(_) => {},
+								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending end of stored events"); },
 							}
 						},
 						_ => {}

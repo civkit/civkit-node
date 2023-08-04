@@ -305,6 +305,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	// We initialize the communication channels between the NoteProcessor and ServiceManager.
 	let (manager_send_dbrequests, receive_dbrequests_manager) = mpsc::unbounded_channel::<(DbRequest)>();
 
+	let (send_db_result_handler, handler_receive_db_result) = mpsc::unbounded_channel::<ClientEvents>();
+
 	// The onion message handler...quite empty for now.
 	let onion_box = OnionBox::new();
 
@@ -315,7 +317,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let credential_gateway = Arc::new(CredentialGateway::new());
 
 	// The note or service provider...quite empty for now.
-	let mut note_processor = NoteProcessor::new(processor_receive_dbrequests, receive_dbrequests_manager);
+	let mut note_processor = NoteProcessor::new(processor_receive_dbrequests, receive_dbrequests_manager, send_db_result_handler);
 
 	// The service provider signer...quite empty for now.
 	let node_signer = Arc::new(NodeSigner::new());
@@ -324,7 +326,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let anchor_manager = Arc::new(AnchorManager::new());
 
 	// Main handler of Nostr connections.
-	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests, config.clone());
+	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests, handler_receive_db_result, config.clone());
 
 	// Main handler of services provision.
 	let board_manager = ServiceManager::new(credential_gateway, node_signer, anchor_manager, board_events_send, board_peer_send, manager_send_dbrequests, config.clone());
