@@ -19,6 +19,7 @@ service BoardCtrl {
 	rpc PublishOffer (SendOffer) returns (ReceivedOffer);
 	rpc PublishInvoice (SendInvoice) returns (ReceivedInvoice);
 	rpc ListDbEvents (ListDbEventsRequest) returns (ListDbEventsReply);
+	rpc ListDbClients (ListDbClientsRequest) returns (ListDbClientsReply);
 }
 
 message PingRequest {
@@ -119,4 +120,10 @@ message ListDbEventsRequest {
 }
 
 message ListDbEventsReply {
+}
+
+message ListDbClientsRequest {
+}
+
+message ListDbClientsReply {
 }

@@ -9,8 +9,9 @@
 
 //! An interface to sanitize and enforce service policy on the received notes.
 
+use crate::events::ClientEvents;
 use crate::nostr_db::DbRequest;
-use crate::nostr_db::{write_new_subscription_db, write_new_event_db, print_events_db};
+use crate::nostr_db::{write_new_subscription_db, write_new_event_db, write_new_client_db, print_events_db, print_clients_db, query_events_db};
 
 use std::sync::Mutex;
 
@@ -23,17 +24,19 @@ pub struct NoteProcessor {
 	current_height: u64,
 
 	receive_db_requests: TokioMutex<mpsc::UnboundedReceiver<DbRequest>>,
+	send_db_result_handler: TokioMutex<mpsc::UnboundedSender<ClientEvents>>,
 
 	receive_db_requests_manager: TokioMutex<mpsc::UnboundedReceiver<DbRequest>>,
 }
 
 impl NoteProcessor {
-	pub fn new(receive_db_requests: mpsc::UnboundedReceiver<DbRequest>, receive_db_requests_manager: mpsc::UnboundedReceiver<DbRequest>) -> Self {
+	pub fn new(receive_db_requests: mpsc::UnboundedReceiver<DbRequest>, receive_db_requests_manager: mpsc::UnboundedReceiver<DbRequest>, send_db_result_handler: mpsc::UnboundedSender<ClientEvents>) -> Self {
 		NoteProcessor {
 			note_counters: Mutex::new(0),
 			current_height: 0,
 
 			receive_db_requests: TokioMutex::new(receive_db_requests),
+			send_db_result_handler: TokioMutex::new(send_db_result_handler),
 
 			receive_db_requests_manager: TokioMutex::new(receive_db_requests_manager),
 		}
@@ -61,15 +64,18 @@ impl NoteProcessor {
 		loop {
 			sleep(Duration::from_millis(1000)).await;
 
+			let mut replay_request = Vec::new();
 			{
 				let mut receive_db_requests_lock = self.receive_db_requests.lock();
 				if let Ok(db_request) = receive_db_requests_lock.await.try_recv() {
 					match db_request {
 						DbRequest::WriteEvent(ev) => { write_new_event_db(ev).await; },
 						DbRequest::WriteSub(ns) => { write_new_subscription_db(ns); },
+						DbRequest::WriteClient(ct) => { write_new_client_db(ct).await; },
+						DbRequest::ReplayEvents { client_id, filters } => { replay_request.push((client_id, filters)); },
 						_ => {},
 					}
-					println!("[CIVKITD] - NOTE PROCESSING: Note processor received DB requests");	
+					println!("[CIVKITD] - NOTE PROCESSING: Note processor received DB requests");
 				}
 			}
 
@@ -78,13 +84,29 @@ impl NoteProcessor {
 				if let Ok(db_request) = receive_db_requests_manager_lock.await.try_recv() {
 					match db_request {
 						DbRequest::DumpEvents => { print_events_db().await; },
+						DbRequest::DumpClients => { print_clients_db().await; },
 						_ => {},
 					}
 					println!("[CIVKITD] - NOTE PROCESSING: Note processor received DB requests from ServiceManager");
 				}
 			}
 
-			//TODO: receive requests from server command
+			let mut event_replay_result = Vec::new();
+			for req in replay_request {
+				let mut client_id_result = Vec::with_capacity(0);
+				for filter in req.1 {
+					if let Ok(events) = query_events_db(filter) {
+						client_id_result = events;
+					}
+				}
+				event_replay_result.push((req.0.clone(), client_id_result));
+			}
+
+			for ret in event_replay_result {
+				let mut send_db_result_handler_lock = self.send_db_result_handler.lock();
+				let stored_event = ClientEvents::StoredEvent { client_id: ret.0, events: ret.1 };
+				send_db_result_handler_lock.await.send(stored_event);
+			}
 		}
 	}
 }

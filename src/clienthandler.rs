@@ -18,7 +18,7 @@ use nostr::key::XOnlyPublicKey;
 
 use crate::config::Config;
 
-use crate::{events, NostrSub};
+use crate::{events, NostrSub, NostrClient};
 use crate::events::{ClientEvents, EventsProvider, ServerCmd};
 use crate::nostr_db::DbRequest;
 
@@ -40,48 +40,6 @@ use tokio_tungstenite::tungstenite::Message;
 
 /// Max number of subscriptions by connected clients.
 const MAX_SUBSCRIPTIONS: u64 = 100;
-
-//TODO: implement config's `maxclientconnections`
-
-#[derive(Debug, Clone)]
-pub struct NostrClient {
-	//TODO: check we're using Schnorr not ECDSA
-	pub pubkey: Option<XOnlyPublicKey>,
-	pub client_id: u64,
-	pub associated_socket: SocketAddr,
-
-	pub subscriptions: HashMap<u64, ()>,
-}
-
-impl NostrClient {
-	fn new(client_id: u64, socket: SocketAddr) -> Self {
-		NostrClient {
-			pubkey: None,
-			client_id,
-			associated_socket: socket,
-			subscriptions: HashMap::new(),
-		}
-	}
-
-	fn has_pubkey(&self) -> bool {
-		self.pubkey.is_some()
-	}
-
-	fn add_pubkey(&mut self, pubkey: XOnlyPublicKey) {
-		self.pubkey = Some(pubkey);
-	}
-
-	fn add_sub(&mut self, sub_id: u64) -> bool {
-		if self.subscriptions.len() as u64 <= MAX_SUBSCRIPTIONS {
-			return self.subscriptions.insert(sub_id, ()).is_none();
-		}
-		false
-	}
-
-	fn has_sub(&self, sub_id: u64) -> bool {
-		self.subscriptions.get(&sub_id).is_some()
-	}
-}
 
 //pub(crate) struct NostrSub {
 //	our_side_id: u64,
@@ -107,6 +65,7 @@ pub struct ClientHandler {
 	connection_receive: Mutex<mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>>,
 
 	send_db_requests: Mutex<mpsc::UnboundedSender<DbRequest>>,
+	handler_receive_db_result: Mutex<mpsc::UnboundedReceiver<ClientEvents>>,
 
 	filtered_events: HashMap<SubscriptionId, Event>,
 
@@ -157,7 +116,7 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, outgoing_rec
 }
 
 impl ClientHandler {
-	pub fn new(handler_receive: mpsc::UnboundedReceiver<ClientEvents>, connection_receive: mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>, send_db_requests: mpsc::UnboundedSender<DbRequest>, our_config: Config) -> Self {
+	pub fn new(handler_receive: mpsc::UnboundedReceiver<ClientEvents>, connection_receive: mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>, send_db_requests: mpsc::UnboundedSender<DbRequest>, handler_receive_db_result: mpsc::UnboundedReceiver<ClientEvents>, our_config: Config) -> Self {
 
 		let (outgoing_receive, incoming_receive) = mpsc::unbounded_channel::<Vec<u8>>();
 
@@ -175,6 +134,7 @@ impl ClientHandler {
 			connection_receive: Mutex::new(connection_receive),
 
 			send_db_requests: Mutex::new(send_db_requests),
+			handler_receive_db_result: Mutex::new(handler_receive_db_result),
 
 			filtered_events: HashMap::new(),
 
@@ -188,7 +148,7 @@ impl ClientHandler {
 		loop {
 			sleep(Duration::from_millis(1000)).await;
 
-			let mut client_event = None;
+			let mut client_events = Vec::new();
 			{
 				// We receive an offer processed by the relay management utility, or any other
 				// service-side Nostr event.
@@ -214,12 +174,20 @@ impl ClientHandler {
 							},
 						}
 					} else {
-						client_event = Some(event)
-					}	
+						client_events.push(event);
+					}
 				}
 			}
 
-			if let Some(event) = client_event {
+			{
+				// We receive a result of a db query from the DB manager.
+				let mut handler_receive_db_result_lock = self.handler_receive_db_result.lock();
+				if let Ok(event) = handler_receive_db_result_lock.await.try_recv() {
+					client_events.push(event);
+				}
+			}
+
+			for event in client_events {
 				let mut map_send_lock = self.map_send.lock();
 
 				for (id, outgoing_send) in map_send_lock.await.iter() {
@@ -250,6 +218,26 @@ impl ClientHandler {
 							match outgoing_send.send(serialized_message.into_bytes()) {
 								Ok(_) => {},
 								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending order"); }
+							}
+						},
+						ClientEvents::StoredEvent { ref client_id,  ref events } => {
+							if id != client_id { continue }
+
+							//TODO: capture the subscription id
+							let random_id = SubscriptionId::generate();
+							for ev in events {
+								let relay_message = RelayMessage::new_event(random_id.clone(), ev.clone());
+								let serialized_message = relay_message.as_json();
+								match outgoing_send.send(serialized_message.into_bytes()) {
+									Ok(_) => {},
+									Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending stored events"); },
+								}
+							}
+							let relay_message = RelayMessage::new_eose(random_id.clone());
+							let serialized_message = relay_message.as_json();
+							match outgoing_send.send(serialized_message.into_bytes()) {
+								Ok(_) => {},
+								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending end of stored events"); },
 							}
 						},
 						_ => {}
@@ -311,10 +299,13 @@ impl ClientHandler {
 				}
 			}
 
+			let mut write_db = Vec::new();
+
 			if let Some((addr, outgoing_send, incoming_receive)) = socket_and_sender {
 				self.clients_counter += 1;
 				let client_id = self.clients_counter;
 				let new_nostr_client = NostrClient::new(client_id as u64, addr);
+				let client_2 = new_nostr_client.clone();
 				self.clients.insert(client_id, new_nostr_client);
 				{
 					let mut map_send_lock = self.map_send.lock();
@@ -324,6 +315,8 @@ impl ClientHandler {
 					let mut map_receive_lock = self.map_receive.lock();
 					map_receive_lock.await.insert(client_id, incoming_receive);
 				}
+				let db_request = DbRequest::WriteClient(client_2);
+				write_db.push(db_request);
 			}
 
 			let mut msg_queue = Vec::new();
@@ -338,7 +331,6 @@ impl ClientHandler {
 			}
 
 			let mut new_pending_events = Vec::new();
-			let mut events_write_db = Vec::new();
 			{
 				// If we have a new event, we'll fan out according to its types (event, subscription, close)
 				for (id, msg) in msg_queue {
@@ -357,7 +349,7 @@ impl ClientHandler {
 								//TODO: we should link our filtering policy to our db storing,
 								//otherwise this is a severe DoS vector
 								let db_request = DbRequest::WriteEvent(*msg_2);
-								events_write_db.push(db_request);
+								write_db.push(db_request);
 							},
 							ClientMessage::Req { subscription_id, filters } => {
 								self.subscriptions_counter += 1;
@@ -366,17 +358,16 @@ impl ClientHandler {
 								if let Some(nostr_client) = self.clients.get_mut(&id) {
 									//TODO: NIP 01 : "Clients should not open more than one websocket to each relay. One channel can support an unlimited number of subscriptions, so clients should do that."
 									// Sanitize with keys ?
-									if !nostr_client.add_sub(our_side_id) {
+									if !nostr_client.add_sub(our_side_id, MAX_SUBSCRIPTIONS) {
 										println!("[CIVKITD] - NOSTR: subscription register failure");
 									}
 								}
-								let nostr_sub = NostrSub::new(our_side_id, subscription_id.clone(), filters);
+								let nostr_sub = NostrSub::new(our_side_id, subscription_id.clone(), filters.clone());
 								let nostr_sub2 = nostr_sub.clone();
 								self.subscriptions.insert(our_side_id, nostr_sub);
-								//TODO: replay stored events when there is a store
+								let db_request = DbRequest::ReplayEvents { client_id: id, filters: filters };
+								write_db.push(db_request);
 								new_pending_events.push(ClientEvents::EndOfStoredEvents { client_id: id, sub_id: subscription_id });
-								let db_request = DbRequest::DumpEvents;
-								events_write_db.push(db_request);
 							},
 							ClientMessage::Close(subscription_id) => {
 								//TODO: replace our_side_id by Sha256 of SubscriptionId
@@ -398,7 +389,7 @@ impl ClientHandler {
 			}
 
 			{
-				for ev in events_write_db {
+				for ev in write_db {
 					let mut send_db_requests_lock = self.send_db_requests.lock();
 					send_db_requests_lock.await.send(ev);
 				}

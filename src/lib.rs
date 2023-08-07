@@ -10,6 +10,10 @@
 use bitcoin::secp256k1::PublicKey;
 
 use nostr::{SubscriptionId, Filter};
+use nostr::key::XOnlyPublicKey;
+
+use std::collections::HashMap;
+use std::net::SocketAddr;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct NostrSub {
@@ -46,6 +50,48 @@ impl NostrPeer {
 		NostrPeer {
 			peer_pubkey,
 		}
+	}
+}
+
+
+//TODO: implement config maxconnections
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct NostrClient {
+	//TODO: check we're using Schnorr not ECDSA
+	pub pubkey: Option<XOnlyPublicKey>,
+	pub client_id: u64,
+	pub associated_socket: SocketAddr,
+
+	pub subscriptions: HashMap<u64, ()>,
+}
+
+impl NostrClient {
+	fn new(client_id: u64, socket: SocketAddr) -> Self {
+		NostrClient {
+			pubkey: None,
+			client_id,
+			associated_socket: socket,
+			subscriptions: HashMap::new(),
+		}
+	}
+
+	fn has_pubkey(&self) -> bool {
+		self.pubkey.is_some()
+	}
+
+	fn add_pubkey(&mut self, pubkey: XOnlyPublicKey) {
+		self.pubkey = Some(pubkey);
+	}
+
+	fn add_sub(&mut self, sub_id: u64, max_sub: u64) -> bool {
+		if self.subscriptions.len() as u64 <= max_sub {
+			return self.subscriptions.insert(sub_id, ()).is_none();
+		}
+		false
+	}
+
+	fn has_sub(&self, sub_id: u64) -> bool {
+		self.subscriptions.get(&sub_id).is_some()
 	}
 }
 

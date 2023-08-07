@@ -7,9 +7,9 @@
 // You may not use this file except in accordance with one or both of these
 // licenses.
 
-use nostr::Event;
+use nostr::{Event, EventBuilder, Filter, Keys, Kind};
 
-use crate::{NostrSub, NostrPeer};
+use crate::{NostrSub, NostrPeer, NostrClient};
 
 use rusqlite::{Connection, OpenFlags, params};
 
@@ -21,18 +21,28 @@ const CIVKITD_DB_FILE: &str = "civkitd.db";
 pub enum DbRequest {
 	WriteEvent(Event),
 	WriteSub(NostrSub),
+	WriteClient(NostrClient),
+	ReplayEvents { client_id: u64, filters: Vec<Filter> },
 	DumpEvents,
+	DumpClients,
 }
 
 #[derive(Debug)]
 struct DbEvent {
 	id: i32,
+	kind: i32,
 	data: Option<Vec<u8>>,
 }
 
 #[derive(Debug)]
 struct DbSub {
 	sub_id: i32,
+	data: Option<Vec<u8>>,
+}
+
+#[derive(Debug)]
+struct DbClient {
+	client_id: i32,
 	data: Option<Vec<u8>>,
 }
 
@@ -47,6 +57,7 @@ pub async fn write_new_event_db(event: Event) {
 
 		match conn.execute("CREATE TABLE event (
 			event_id	INTEGER PRIMARY KEY,
+			kind		INTEGER,
 			data		BLOB
 		)",
 		()) {
@@ -57,6 +68,7 @@ pub async fn write_new_event_db(event: Event) {
 		//TODO: add complete event
 		let event = DbEvent {
 			id: 0,
+			kind: 0,
 			data: None,
 		};
 
@@ -84,12 +96,107 @@ pub async fn print_events_db() {
 			let event_iter = stmt.query_map([], |row| {
 				Ok(DbEvent {
 					id: row.get(0)?,
-					data: row.get(1)?,
+					kind: row.get(1)?,
+					data: row.get(2)?,
 				})
 			}).unwrap();
 
 			for event in event_iter {
 				println!("[CIVKITD] - NOTE PROCESSING: Found event {:?}", event.unwrap());
+			}
+		}
+
+		conn.close().ok();
+	} else { println!("Failure to open database"); }
+}
+
+pub fn query_events_db(filter: Filter) -> Result<Vec<Event>, ()> {
+
+	if let Ok(mut conn) = Connection::open_with_flags(
+		Path::new(CIVKITD_DB_FILE),
+		OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE
+	) {
+		if let Some(kinds) = filter.kinds {
+			let sql = format!("SELECT kind FROM event WHERE kind = {}", kinds[0].as_u32());
+			let mut stmt = conn.prepare(&sql).unwrap();
+			let event_iter = stmt.query_map([], |row| {
+				Ok(DbEvent {
+					id: row.get(0)?,
+					kind: row.get(1)?,
+					data: row.get(2)?,
+				})
+			}).unwrap();
+
+			let mut result_events = Vec::new();
+
+			//TODO: write keys on DB
+			let dummy_keys = Keys::generate();
+			for event in event_iter {
+				let db_event = event.unwrap();
+				let e = EventBuilder::new(Kind::from(db_event.kind as u64), "test", &[]).to_event(&dummy_keys).unwrap();
+				result_events.push(e);
+			}
+
+			return Ok(result_events);
+		}
+	}
+
+	Err(())	
+}
+
+pub async fn write_new_client_db(client: NostrClient) {
+
+	//TODO: spawn new thread
+	if let Ok(mut conn) = Connection::open_with_flags(
+		Path::new(CIVKITD_DB_FILE),
+		OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE
+	) {
+		println!("[CIVKITD] - NOTE PROCESSING: Opening database for read / write new client");
+
+		match conn.execute("CREATE TABLE client (
+			client_id	INTEGER PRIMARY KEY,
+			data		BLOB
+		)",
+		()) {
+			Ok(create) => println!("[CIVKITD] - NOTE PROCESSING: {} rows were updated", create),
+			Err(err) => println!("[CIVKITD] - NOTE PROCESSING: table creation failed: {}", err),
+		}
+
+		let client = DbClient {
+			client_id: 0,
+			data: None,
+		};
+
+		match conn.execute("INSERT INTO client (data) VALUES (:data)",
+			&[(&client.data)],
+		) {
+			Ok(update) => println!("[CIVKITD] - NOTE PROCESSING: {} rows were updated", update),
+			Err(err) => println!("[CIVKITD] - NOTE PROCESSING: update insert failed: {}", err),
+		}
+
+		conn.close().ok();
+	} else { println!("Failure to open database"); }
+}
+
+pub async fn print_clients_db() {
+
+	if let Ok(mut conn) = Connection::open_with_flags(
+		Path::new(CIVKITD_DB_FILE),
+		OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE
+	) {
+		println!("[CIVKITD] - NOTE PROCESSING: Opening database for read clients");
+
+		{
+			let mut stmt = conn.prepare("SELECT client_id, data FROM client").unwrap();
+			let client_iter = stmt.query_map([], |row| {
+				Ok(DbClient {
+					client_id: row.get(0)?,
+					data: row.get(1)?,
+				})
+			}).unwrap();
+
+			for client in client_iter {
+				println!("[CIVKITD] - NOTE PROCESSING: Found client {:?}", client.unwrap());
 			}
 		}
 
@@ -129,6 +236,7 @@ pub async fn log_new_peer_db(peer: NostrPeer) {
 
 		let event = DbEvent {
 			id: 0,
+			kind: 0,
 			data: None,
 		};
 

@@ -10,7 +10,7 @@
 //! Internal events used to exchange information between ServiceManager and
 //! ClientHandler.
 
-use crate::clienthandler::NostrClient;
+use crate::NostrClient;
 
 use nostr::{Event, SubscriptionId};
 
@@ -21,6 +21,7 @@ pub enum ClientEvents {
 	TextNote { event: Event },
 	Server { cmd: ServerCmd },
 	OrderNote { order: Event },
+	StoredEvent { client_id: u64, events: Vec<Event> },
 	EndOfStoredEvents { client_id: u64, sub_id: SubscriptionId },
 	RelayNotice { message: String },
 	SubscribedEvent { client_id: u64, sub_id: SubscriptionId, event: Event },
