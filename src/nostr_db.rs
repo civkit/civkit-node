@@ -29,9 +29,12 @@ pub enum DbRequest {
 
 #[derive(Debug)]
 struct DbEvent {
-	id: i32,
-	kind: i32,
-	data: Option<Vec<u8>>,
+	id: u32,
+	sha256: Vec<u8>,
+	pubkey: Vec<u8>,
+	timestamp: i64,
+	kind: u32,
+	content: Option<String>,
 }
 
 #[derive(Debug)]
@@ -57,8 +60,11 @@ pub async fn write_new_event_db(event: Event) {
 
 		match conn.execute("CREATE TABLE event (
 			event_id	INTEGER PRIMARY KEY,
-			kind		INTEGER,
-			data		BLOB
+			sha256		BLOB,
+			pubkey		BLOB,
+			timestamp	BIG INT,
+			kind		UNSIGNED INTEGER,
+			content		TEXT,
 		)",
 		()) {
 			Ok(create) => println!("[CIVKITD] - NOTE PROCESSING: {} rows were updated", create),
@@ -68,12 +74,15 @@ pub async fn write_new_event_db(event: Event) {
 		//TODO: add complete event
 		let event = DbEvent {
 			id: 0,
-			kind: 0,
-			data: None,
+			sha256: event.id.as_bytes().to_vec(),
+			pubkey: event.pubkey.serialize().to_vec(),
+			timestamp: event.created_at.as_i64(),
+			kind: event.kind.as_u32(),
+			content: Some(event.content)
 		};
 
-		match conn.execute("INSERT INTO event (data) VALUES (:data)",
-			&[(&event.data)],
+		match conn.execute("INSERT INTO event (sha256, pubkey, timestamp, kind, content) VALUES (?1, ?2, ?3, ?4, ?5)",
+			(&event.sha256, &event.pubkey, &event.timestamp, &event.kind, &event.content),
 		) {
 			Ok(update) => println!("[CIVKITD] - NOTE PROCESSING: {} rows were updated", update),
 			Err(err) => println!("[CIVKITD] - NOTE PROCESSING: update insert failed: {}", err),
@@ -92,12 +101,15 @@ pub async fn print_events_db() {
 		println!("[CIVKITD] - NOTE PROCESSING: Opening database for read events");
 
 		{
-			let mut stmt = conn.prepare("SELECT event_id, data FROM event").unwrap();
+			let mut stmt = conn.prepare("SELECT event_id, sha256, pubkey, timestamp, kind, content FROM event").unwrap();
 			let event_iter = stmt.query_map([], |row| {
 				Ok(DbEvent {
 					id: row.get(0)?,
-					kind: row.get(1)?,
-					data: row.get(2)?,
+					sha256: row.get(1)?,
+					pubkey: row.get(2)?,
+					timestamp: row.get(3)?,
+					kind: row.get(4)?,
+					content: row.get(5)?
 				})
 			}).unwrap();
 
@@ -117,13 +129,16 @@ pub fn query_events_db(filter: Filter) -> Result<Vec<Event>, ()> {
 		OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE
 	) {
 		if let Some(kinds) = filter.kinds {
-			let sql = format!("SELECT kind FROM event WHERE kind = {}", kinds[0].as_u32());
+			let sql = format!("SELECT event_id, sha256, pubkey, timestamp, kind, content, FROM event WHERE kind = {}", kinds[0].as_u32());
 			let mut stmt = conn.prepare(&sql).unwrap();
 			let event_iter = stmt.query_map([], |row| {
 				Ok(DbEvent {
 					id: row.get(0)?,
-					kind: row.get(1)?,
-					data: row.get(2)?,
+					sha256: row.get(1)?,
+					pubkey: row.get(2)?,
+					timestamp: row.get(3)?,
+					kind: row.get(4)?,
+					content: row.get(5)?,
 				})
 			}).unwrap();
 
@@ -133,7 +148,7 @@ pub fn query_events_db(filter: Filter) -> Result<Vec<Event>, ()> {
 			let dummy_keys = Keys::generate();
 			for event in event_iter {
 				let db_event = event.unwrap();
-				let e = EventBuilder::new(Kind::from(db_event.kind as u64), "test", &[]).to_event(&dummy_keys).unwrap();
+				let e = EventBuilder::new(Kind::from(db_event.kind as u64), db_event.content.unwrap(), &[]).to_event(&dummy_keys).unwrap();
 				result_events.push(e);
 			}
 
@@ -234,16 +249,16 @@ pub async fn log_new_peer_db(peer: NostrPeer) {
 		)",
 		());
 
-		let event = DbEvent {
-			id: 0,
-			kind: 0,
-			data: None,
-		};
+		//let event = DbEvent {
+		//	id: 0,
+		//	kind: 0,
+		//	data: None,
+		//};
 
-		conn.execute(
-			"INSERT INTO event (data) VALUES (:data)",
-			&[(&event.data)],
-		);
+		//conn.execute(
+		//	"INSERT INTO event (data) VALUES (:data)",
+		//	&[(&event.data)],
+		//);
 	}
 }
 

@@ -367,7 +367,6 @@ impl ClientHandler {
 								self.subscriptions.insert(our_side_id, nostr_sub);
 								let db_request = DbRequest::ReplayEvents { client_id: id, filters: filters };
 								write_db.push(db_request);
-								new_pending_events.push(ClientEvents::EndOfStoredEvents { client_id: id, sub_id: subscription_id });
 							},
 							ClientMessage::Close(subscription_id) => {
 								//TODO: replace our_side_id by Sha256 of SubscriptionId
