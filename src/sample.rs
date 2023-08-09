@@ -99,6 +99,12 @@ fn cli() -> Command {
                 .help_template(APPLET_TEMPLATE)
                 .about("Recommend a server to the relay"),
         )
+	.subcommand(
+	    Command::new("sendmarketorder")
+	    	.args([Arg::new("content").help("the order type (either bolt11 or bolt12)").required(true)])
+		.help_template(APPLET_TEMPLATE)
+		.about("Send a market order (kind: 32500) to the relay"),
+	)
         .subcommand(
             Command::new("opensubscription")
                 .args([
@@ -172,6 +178,17 @@ fn respond(
                     .unwrap();
             }
         }
+	Some(("sendmarketorder", matches)) => {
+	    let content: Option<&String> = matches.get_one("content");
+	    if let Ok(kind_32500_event) =
+	        EventBuilder::new_order_note(content.unwrap(), &[]).to_event(client_keys)
+	    {
+		let client_message = ClientMessage::new_event(kind_32500_event);
+		let serialized_message = client_message.as_json();
+		tx.unbounded_send(Message::text(serialized_message))
+			.unwrap();
+	    }
+	}
         Some(("opensubscription", matches)) => {
             let subscriptionid: Option<&String> = matches.get_one("subscriptionid");
             let kinds_raw: Option<&String> = matches.get_one("kinds");

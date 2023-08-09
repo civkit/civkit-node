@@ -64,7 +64,7 @@ pub async fn write_new_event_db(event: Event) {
 			pubkey		BLOB,
 			timestamp	BIG INT,
 			kind		UNSIGNED INTEGER,
-			content		TEXT,
+			content		TEXT
 		)",
 		()) {
 			Ok(create) => println!("[CIVKITD] - NOTE PROCESSING: {} rows were updated", create),
@@ -129,7 +129,8 @@ pub fn query_events_db(filter: Filter) -> Result<Vec<Event>, ()> {
 		OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE
 	) {
 		if let Some(kinds) = filter.kinds {
-			let sql = format!("SELECT event_id, sha256, pubkey, timestamp, kind, content, FROM event WHERE kind = {}", kinds[0].as_u32());
+			//TODO: iter on all the kinds provided by the filter
+			let sql = format!("SELECT event_id, sha256, pubkey, timestamp, kind, content FROM event WHERE kind = {}", kinds[0].as_u32());
 			let mut stmt = conn.prepare(&sql).unwrap();
 			let event_iter = stmt.query_map([], |row| {
 				Ok(DbEvent {
@@ -156,7 +157,7 @@ pub fn query_events_db(filter: Filter) -> Result<Vec<Event>, ()> {
 		}
 	}
 
-	Err(())	
+	Err(())
 }
 
 pub async fn write_new_client_db(client: NostrClient) {
