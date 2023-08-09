@@ -100,6 +100,8 @@ Connecting to a BOLT8 peer on local.
 [CIVKITD] - NOISE: opening outgoing noise connection!
 
 /* On logs of civkitd #2 */
+
+
 [CIVKITD] - INIT: CivKit node starting up...
 [CIVKITD] - INIT: noise port 60001 nostr port 60011 cli_port 60021
 [CIVKITD] - NET: ready to listen tcp connection for clients !
@@ -111,24 +113,53 @@ Publishing a trade order (BOLT11 version).
 ```
 ./civkitd
 
-./civkit-cli publishinvoice lnbc2500u1pvjluezsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpu9qrsgquk0rl77nj30yxdy8j9vdx85fkpmdla2087ne0xh8nhedh8w27kyke0lp53ut353s06fv3qfegext0eh0ymjpf39tuven09sam30g4vgpfna3rh
-
-./civkit-sample
-
 /* On logs of civkitd */
 [CIVKITD] - INIT: CivKit node starting up...
 [CIVKITD] - INIT: noise port 9735 nostr port 50021 cli_port 50031
 [CIVKITD] - NET: ready to listen tcp connection for clients !
-[CIVKITD] - NET: receive a tcp connection !
-[CIVKITD] - NET: incoming tcp Connection from :[::1]:50911
-[CIVKITD] - NET: websocket established: [::1]:50911
-[CIVKITD] - PROCESSING: received an event from service manager
-[CIVKITD] - NOSTR: sending event for client 1
 
-/* On logs of civkit-sample */
+./civkit-sample (civkit-sample #1)
 Civkit sample startup successful. Enter "help" to view available commands
+
+/* On prompt of civkit-sample #1 */
+> sendmarketorder lnbc1pvjluezsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdpl2pkx2ctnv5sxxmmwwd5kgetjypeh2ursdae8g6twvus8g6rfwvs8qun0dq9qrsgq357wnc5r2ueh7ck6q93dj32dlqnls087fxdwk8qakdyafkq3yap9us6v52vjjsrvywa6rt52cm9r9zqt8r2t7mlcwspyetp5h2tztugp9lfyql
 > 
-[EVENT] new trade offer:  lnbc1pj2aey9dpzfpjhyefqvys8gunpv3jjq6twwehkjcm9yypp5qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsp59g4z52329g4z52329g4z52329g4z52329g4z52329g4z52329g4q9qrsgqcqzysk7er2zn07fwp0drlja8lf9lrre28qutvkqg4mrt8aa3y7kr33qhyfp903uyhtzlngv7a0yyg7kmx9alvejzk970p7834djwzxz60eggqt6upps
+
+./civkit-sample (civkitd #2)
+Civkit sample startup successful. Enter "help" to view available commands
+
+/* On prompt of civkit-sample #2 */
+> opensubscription market 32500 0 100000
+> 
+[EVENT] new trade offer:   lnbc1pvjluezsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdpl2pkx2ctnv5sxxmmwwd5kgetjypeh2ursdae8g6twvus8g6rfwvs8qun0dq9qrsgq357wnc5r2ueh7ck6q93dj32dlqnls087fxdwk8qakdyafkq3yap9us6v52vjjsrvywa6rt52cm9r9zqt8r2t7mlcwspyetp5h2tztugp9lfyql
+
+[EOSE] fd0b0e4a871a00de7730d07943ec2247
+> 
+
+/* On logs of civkitd */
+[CIVKITD] - NET: receive a tcp connection !
+[CIVKITD] - NET: incoming tcp Connection from :[::1]:49659
+[CIVKITD] - NET: websocket established: [::1]:49659
+[CIVKITD] - NOTE PROCESSING: Opening database for read / write new client
+[CIVKITD] - NOTE PROCESSING: 0 rows were updated
+[CIVKITD] - NOTE PROCESSING: 1 rows were updated
+[CIVKITD] - NOTE PROCESSING: Note processor received DB requests
+[CIVKITD] - NOSTR: Message received from 1!
+[CIVKITD] - NOTE PROCESSING: Opening database for read / write new event
+[CIVKITD] - NOTE PROCESSING: 0 rows were updated
+[CIVKITD] - NOTE PROCESSING: 1 rows were updated
+[CIVKITD] - NOTE PROCESSING: Note processor received DB requests
+[CIVKITD] - NET: receive a tcp connection !
+[CIVKITD] - NET: incoming tcp Connection from :[::1]:49660
+[CIVKITD] - NET: websocket established: [::1]:49660
+[CIVKITD] - NOTE PROCESSING: Opening database for read / write new client
+[CIVKITD] - NOTE PROCESSING: table creation failed: table client already exists
+[CIVKITD] - NOTE PROCESSING: 1 rows were updated
+[CIVKITD] - NOTE PROCESSING: Note processor received DB requests
+[CIVKITD] - NOSTR: Message received from 2!
+[CIVKITD] - NOTE PROCESSING: Note processor received DB requests
+[CIVKITD] - NOSTR: sending event for client 2
+[CIVKITD] - NOSTR: sending event for client 1
 ```
 
 Development Process
