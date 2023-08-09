@@ -229,7 +229,6 @@ async fn poll_for_server_output(mut rx: futures_channel::mpsc::UnboundedReceiver
 			    //TODO: NIP 01: `EVENT` messages MUST be sent only with a subscriptionID related to a subscription previously initiated by the client (using the `REQ` message above)`
 			    let display_board_order = if event.kind == Kind::Order { true } else { false };
 			    println!("\n[EVENT] {}  {}", if display_board_order { "new trade offer: " } else { "" }, event.content);
-			    print!("> ");
 			    io::stdout().flush().unwrap();
 			},
                         RelayMessage::Notice { message } => {

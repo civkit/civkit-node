@@ -268,12 +268,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let data_dir = util::get_default_data_dir();
 
     // Initialize the logger
-    let log_writer = util::init_logger(&data_dir)?;
+    //let log_writer = util::init_logger(&data_dir)?;
 
     // Initialize the logger and log the log file path
     log::info!("Logging initialized. Log file located at: {:?}", data_dir.join("debug.log"));
 
-    let contents = fs::read_to_string("../../example-config.toml")
+    let contents = fs::read_to_string("./example-config.toml")
         .expect("Something went wrong reading the file");
 
     let config: Config = toml::from_str(&contents)
