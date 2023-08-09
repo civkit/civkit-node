@@ -64,7 +64,7 @@ pub async fn write_new_event_db(event: Event) {
 			pubkey		BLOB,
 			timestamp	BIG INT,
 			kind		UNSIGNED INTEGER,
-			content		TEXT,
+			content		TEXT
 		)",
 		()) {
 			Ok(create) => println!("[CIVKITD] - NOTE PROCESSING: {} rows were updated", create),
