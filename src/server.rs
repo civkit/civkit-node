@@ -267,18 +267,30 @@ struct Cli {
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let data_dir = util::get_default_data_dir();
 
-    // Initialize the logger
-    //let log_writer = util::init_logger(&data_dir)?;
+	let config_path = data_dir.join("example-config.toml");
 
-    // Initialize the logger and log the log file path
+    // Read the configuration file
+    let contents = fs::read_to_string(&config_path);
+    let config = match contents {
+        Ok(data) => {
+            toml::from_str(&data).expect("Could not deserialize the config file content")
+        },
+        Err(_) => {
+            // If there's an error reading the file, use the default configuration
+            Config::default()
+        }
+    };
+    // Initialize the logger with the level from the config
+    util::init_logger(&data_dir, &config.logging.level)?;
+
     log::info!("Logging initialized. Log file located at: {:?}", data_dir.join("debug.log"));
 
-    let contents = fs::read_to_string("./example-config.toml")
-        .expect("Something went wrong reading the file");
-
-    let config: Config = toml::from_str(&contents)
-        .expect("Could not deserialize the config file content");
-
+    // Test logging at different levels
+    log::error!("This is a test error message");
+    log::warn!("This is a test warning message");
+    log::info!("This is a test info message");
+    log::debug!("This is a test debug message");
+    log::trace!("This is a test trace message");
     // Log the parsed configuration data
     //log::info!("Parsed configuration: {:?}", config);	
 	let cli = Cli::parse();

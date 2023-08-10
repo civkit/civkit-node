@@ -13,3 +13,6 @@ network = "testnet"
 noise_port = 9735
 nostr_port = 50021
 cli_port = 50031
+
+[logging]
+level = "info"
