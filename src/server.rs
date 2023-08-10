@@ -9,14 +9,14 @@
 
 /// Main server of the CivKit Node, orchestrate all the components.
 
-mod boardmanager;
+mod servicemanager;
 mod config;
 mod util;
 
 use crate::util::init_logger;
 use log;
 use std::fs;
-use crate::boardmanager::ServiceManager;
+use crate::servicemanager::ServiceManager;
 use civkit::nostr_db::DbRequest;
 use civkit::config::Config;
 use civkit::clienthandler::ClientHandler;
@@ -35,7 +35,7 @@ use lightning::offers::offer::Offer;
 
 use lightning_invoice::Invoice;
 
-use boardctrl::board_ctrl_server::{BoardCtrl, BoardCtrlServer};
+use adminctrl::admin_ctrl_server::{AdminCtrl, AdminCtrlServer};
 
 use clap::Parser;
 
@@ -57,26 +57,26 @@ use tokio_tungstenite::WebSocketStream;
 use tonic::{transport::Server, Request, Response, Status};
 
 //TODO: rename boarctrl to something like relayctrl ?
-pub mod boardctrl {
-	tonic::include_proto!("boardctrl");
+pub mod adminctrl {
+	tonic::include_proto!("adminctrl");
 }
 
 #[tonic::async_trait]
-impl BoardCtrl for ServiceManager {
-	async fn ping_handle(&self, request: Request<boardctrl::PingRequest>) -> Result<Response<boardctrl::PongRequest>, Status> {
-		let pong = boardctrl::PongRequest {
+impl AdminCtrl for ServiceManager {
+	async fn ping_handle(&self, request: Request<adminctrl::PingRequest>) -> Result<Response<adminctrl::PongRequest>, Status> {
+		let pong = adminctrl::PongRequest {
 			name: format!("{}", request.into_inner().name).into(),
 		};
 
 		Ok(Response::new(pong))
 	}
 
-	async fn shutdown_handle(&self, request: Request<boardctrl::ShutdownRequest>) -> Result<Response<boardctrl::ShutdownReply>, Status> {
+	async fn shutdown_handle(&self, request: Request<adminctrl::ShutdownRequest>) -> Result<Response<adminctrl::ShutdownReply>, Status> {
 		println!("[CIVKITD] - CONTROL: CivKit node shuting down...");
 		process::exit(0x0);
 	}
 
-	async fn publish_text_note(&self, request: Request<boardctrl::SendNote>) -> Result<Response<boardctrl::ReceivedNote>, Status> {
+	async fn publish_text_note(&self, request: Request<adminctrl::SendNote>) -> Result<Response<adminctrl::ReceivedNote>, Status> {
 		let note_content = request.into_inner().content;
 
 		let service_keys = Keys::generate();
@@ -87,14 +87,14 @@ impl BoardCtrl for ServiceManager {
 			service_send_lock.send(ClientEvents::TextNote { event: kind1_event });
 		}
 
-		let received_note = boardctrl::ReceivedNote {
+		let received_note = adminctrl::ReceivedNote {
 			name: format!("Note publication scheduled").into(),
 		};
 
 		Ok(Response::new(received_note))
 	}
 
-	async fn disconnect_client(&self, request: Request<boardctrl::DisconnectClientRequest>) -> Result<Response<boardctrl::DisconnectClientReply>, Status> {
+	async fn disconnect_client(&self, request: Request<adminctrl::DisconnectClientRequest>) -> Result<Response<adminctrl::DisconnectClientReply>, Status> {
 		let disconnect_request = request.into_inner().client_id;
 
 		{
@@ -102,45 +102,45 @@ impl BoardCtrl for ServiceManager {
 			service_send_lock.send(ClientEvents::Server { cmd: ServerCmd::DisconnectClient { client_id: disconnect_request }});
 		}
 
-		Ok(Response::new(boardctrl::DisconnectClientReply {}))
+		Ok(Response::new(adminctrl::DisconnectClientReply {}))
 	}
 
-	async fn connect_peer(&self, request: Request<boardctrl::PeerConnectionRequest>) -> Result<Response<boardctrl::PeerConnectionReply>, Status> {
+	async fn connect_peer(&self, request: Request<adminctrl::PeerConnectionRequest>) -> Result<Response<adminctrl::PeerConnectionReply>, Status> {
 		let peer_port = request.into_inner().local_port;
 
 		println!("[CIVKITD] - CONTROL: sending port to noise gateway !");
 		if peer_port > 0 {
-			let mut board_peers_lock = self.service_peers_send.lock().unwrap();
+			let mut service_mngr_peers_lock = self.service_peers_send.lock().unwrap();
 
 			let peer_info = PeerInfo::new(peer_port);
-			board_peers_lock.send(peer_info);
+			service_mngr_peers_lock.send(peer_info);
 		}
 
-		Ok(Response::new(boardctrl::PeerConnectionReply {}))
+		Ok(Response::new(adminctrl::PeerConnectionReply {}))
 	}
 
-	async fn list_peers(&self, request: Request<boardctrl::ListPeersRequest>) -> Result<Response<boardctrl::ListPeersReply>, Status> {
+	async fn list_peers(&self, request: Request<adminctrl::ListPeersRequest>) -> Result<Response<adminctrl::ListPeersReply>, Status> {
 
-		let peers_query = boardctrl::ListPeersReply {
+		let peers_query = adminctrl::ListPeersReply {
 			peers: 1,
 		};
 
 		Ok(Response::new(peers_query))
 	}
 
-	async fn list_clients(&self, request: Request<boardctrl::ListClientRequest>) -> Result<Response<boardctrl::ListClientReply>, Status> {
+	async fn list_clients(&self, request: Request<adminctrl::ListClientRequest>) -> Result<Response<adminctrl::ListClientReply>, Status> {
 		println!("[CIVKITD] - CONTROL: sending list-clients request to ClientHandler!");
 		let (send, recv) = oneshot::channel::<Vec<NostrClient>>();
 		{
-			let mut board_send_lock = self.service_events_send.lock().unwrap();
-			board_send_lock.send(ClientEvents::Server { cmd: ServerCmd::GetClients { respond_to: send }});
+			let mut service_mngr_send_lock = self.service_events_send.lock().unwrap();
+			service_mngr_send_lock.send(ClientEvents::Server { cmd: ServerCmd::GetClients { respond_to: send }});
 		}
 		let response = recv.await.expect("ClientHandler has been killed");
 		
-		let board_clients: Vec<boardctrl::Client> = response
+		let service_mngr_clients: Vec<adminctrl::Client> = response
     		.iter()
     		.map(|client| {
-				boardctrl::Client {
+				adminctrl::Client {
 					pubkey: client.pubkey.map(|s| s.to_string()).unwrap_or("".to_string()),
 					client_id: client.client_id,
 					associated_socket: client.associated_socket.to_string(),
@@ -148,53 +148,53 @@ impl BoardCtrl for ServiceManager {
 				}
 			})
 			.collect();
-		let client_query = boardctrl::ListClientReply {
-			clients: board_clients,
+		let client_query = adminctrl::ListClientReply {
+			clients: service_mngr_clients,
 		};
 	
 		Ok(Response::new(client_query))
 	}
 
-	async fn list_subscriptions(&self, request: Request<boardctrl::ListSubscriptionRequest>) -> Result<Response<boardctrl::ListSubscriptionReply>, Status> {
+	async fn list_subscriptions(&self, request: Request<adminctrl::ListSubscriptionRequest>) -> Result<Response<adminctrl::ListSubscriptionReply>, Status> {
 
-		let sub_query = boardctrl::ListSubscriptionReply {
+		let sub_query = adminctrl::ListSubscriptionReply {
 			subscriptions: 1,
 		};
 
 		Ok(Response::new(sub_query))
 	}
 
-	async fn status_handle(&self, request: Request<boardctrl::BoardStatusRequest>) -> Result<Response<boardctrl::BoardStatusReply>, Status> {
+	async fn relay_status_handle(&self, request: Request<adminctrl::ServiceMngrStatusRequest>) -> Result<Response<adminctrl::ServiceMngrStatusReply>, Status> {
 
 		//TODO give a mspc communication channel between ServiceManager and NoteProcessor
 		let notes = 0;
 		//let notes = self.note_stats();
 
-		let board_status = boardctrl::BoardStatusReply {
+		let service_mngr_status = adminctrl::ServiceMngrStatusReply {
 			offers: notes,
 		};
 
-		Ok(Response::new(board_status))
+		Ok(Response::new(service_mngr_status))
 	}
 
-	async fn publish_notice(&self, request: Request<boardctrl::SendNotice>) -> Result<Response<boardctrl::ReceivedNotice>, Status> {
+	async fn publish_notice(&self, request: Request<adminctrl::SendNotice>) -> Result<Response<adminctrl::ReceivedNotice>, Status> {
 		let notice_message = request.into_inner().info_message;
 
 		let service_keys = Keys::generate();
 
 		{
-			let mut board_send_lock = self.service_events_send.lock().unwrap();
-			board_send_lock.send(ClientEvents::RelayNotice { message: notice_message });
+			let mut service_mngr_send_lock = self.service_events_send.lock().unwrap();
+			service_mngr_send_lock.send(ClientEvents::RelayNotice { message: notice_message });
 		}
 
-		let received_note = boardctrl::ReceivedNote {
+		let received_note = adminctrl::ReceivedNote {
 			name: format!("Note publication scheduled").into(),
 		};
 
-		Ok(Response::new(boardctrl::ReceivedNotice {}))
+		Ok(Response::new(adminctrl::ReceivedNotice {}))
 	}
 
-	async fn publish_offer(&self, request: Request<boardctrl::SendOffer>) -> Result<Response<boardctrl::ReceivedOffer>, Status> {
+	async fn publish_offer(&self, request: Request<adminctrl::SendOffer>) -> Result<Response<adminctrl::ReceivedOffer>, Status> {
 		let offer_message = request.into_inner().offer;
 
 		let service_keys = Keys::generate();
@@ -203,15 +203,15 @@ impl BoardCtrl for ServiceManager {
 			let encoded_offer = offer.to_string();
 			if let Ok(kind32500_event) = EventBuilder::new_order_note(encoded_offer, &[]).to_event(&service_keys)
 			{
-				let mut board_send_lock = self.service_events_send.lock().unwrap();
-				board_send_lock.send(ClientEvents::OrderNote { order: kind32500_event });
+				let mut service_mngr_send_lock = self.service_events_send.lock().unwrap();
+				service_mngr_send_lock.send(ClientEvents::OrderNote { order: kind32500_event });
 			}
 		}
 
-		Ok(Response::new(boardctrl::ReceivedOffer {}))
+		Ok(Response::new(adminctrl::ReceivedOffer {}))
 	}
 
-	async fn publish_invoice(&self, request: Request<boardctrl::SendInvoice>) -> Result<Response<boardctrl::ReceivedInvoice>, Status> {
+	async fn publish_invoice(&self, request: Request<adminctrl::SendInvoice>) -> Result<Response<adminctrl::ReceivedInvoice>, Status> {
 		let invoice_message = request.into_inner().invoice;
 
 		let service_keys = Keys::generate();
@@ -219,14 +219,14 @@ impl BoardCtrl for ServiceManager {
 		//let encoded_invoice = invoice.to_string();
 		if let Ok(kind32500_event) = EventBuilder::new_order_note(invoice_message, &[]).to_event(&service_keys)
 		{
-				let mut board_send_lock = self.service_events_send.lock().unwrap();
-				board_send_lock.send(ClientEvents::OrderNote { order: kind32500_event });
+				let mut service_mngr_send_lock = self.service_events_send.lock().unwrap();
+				service_mngr_send_lock.send(ClientEvents::OrderNote { order: kind32500_event });
 		}
 
-		Ok(Response::new(boardctrl::ReceivedInvoice {}))
+		Ok(Response::new(adminctrl::ReceivedInvoice {}))
 	}
 
-	async fn list_db_events(&self, request: Request<boardctrl::ListDbEventsRequest>) -> Result<Response<boardctrl::ListDbEventsReply>, Status> {
+	async fn list_db_events(&self, request: Request<adminctrl::ListDbEventsRequest>) -> Result<Response<adminctrl::ListDbEventsReply>, Status> {
 
 		println!("[CIVKITD] - CONTROL: listing DB event !");
 
@@ -235,10 +235,10 @@ impl BoardCtrl for ServiceManager {
 			send_db_request_lock.send(DbRequest::DumpEvents);
 		}
 
-		Ok(Response::new(boardctrl::ListDbEventsReply {}))
+		Ok(Response::new(adminctrl::ListDbEventsReply {}))
 	}
 
-	async fn list_db_clients(&self, request: Request<boardctrl::ListDbClientsRequest>) -> Result<Response<boardctrl::ListDbClientsReply>, Status> {
+	async fn list_db_clients(&self, request: Request<adminctrl::ListDbClientsRequest>) -> Result<Response<adminctrl::ListDbClientsReply>, Status> {
 
 		println!("[CIVKITD] - CONTROL: listing DB clients !");
 
@@ -247,7 +247,7 @@ impl BoardCtrl for ServiceManager {
 			send_db_request_lock.send(DbRequest::DumpClients);
 		}
 
-		Ok(Response::new(boardctrl::ListDbClientsReply {}))
+		Ok(Response::new(adminctrl::ListDbClientsReply {}))
 	}
 }
 
@@ -303,10 +303,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let rt = Runtime::new()?;
 
 	// We initialize the communication channels between the service manager and ClientHandler.
-	let (board_events_send, handler_receive) = mpsc::unbounded_channel::<ClientEvents>();
+	let (service_mngr_events_send, handler_receive) = mpsc::unbounded_channel::<ClientEvents>();
 
 	// We initialize the communication channels between the service manager and NoiseGateway.
-	let (board_peer_send, gateway_receive) = mpsc::unbounded_channel::<PeerInfo>();
+	let (service_mngr_peer_send, gateway_receive) = mpsc::unbounded_channel::<PeerInfo>();
 
 	// We initialize the communication channels between the nostr tcp listener and ClientHandler.
 	let (socket_connector, request_receive) = mpsc::unbounded_channel::<(TcpStream, SocketAddr)>();
@@ -341,12 +341,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests, handler_receive_db_result, config.clone());
 
 	// Main handler of services provision.
-	let board_manager = ServiceManager::new(node_signer, anchor_manager, board_events_send, board_peer_send, manager_send_dbrequests, config.clone());
+	let service_manager = ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, config.clone());
 
 	let addr = format!("[::1]:{}", cli.cli_port).parse()?;
 
-	let board_svc = Server::builder()
-		.add_service(BoardCtrlServer::new(board_manager))
+	let service_mngr_svc = Server::builder()
+		.add_service(AdminCtrlServer::new(service_manager))
 		.serve(addr);
 
 	let peer_manager = noise_gateway.peer_manager.clone();
@@ -357,7 +357,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 	// We start the gRPC server for `civkit-cli`.
     	tokio::spawn(async move {
-		if let Err(e) = board_svc.await {
+		if let Err(e) = service_mngr_svc.await {
 			eprintln!("Error = {:?}", e);
 		}
 	});
