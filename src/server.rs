@@ -37,6 +37,8 @@ use lightning_invoice::Invoice;
 
 use adminctrl::admin_ctrl_server::{AdminCtrl, AdminCtrlServer};
 
+use crate::civkitservice::civkit_service_server::{CivkitService, CivkitServiceServer};
+
 use clap::Parser;
 
 use nostr::{Keys, EventBuilder};
@@ -60,6 +62,11 @@ use tonic::{transport::Server, Request, Response, Status};
 pub mod adminctrl {
 	tonic::include_proto!("adminctrl");
 }
+
+pub mod civkitservice {
+	tonic::include_proto!("civkitservice");
+}
+
 
 #[tonic::async_trait]
 impl AdminCtrl for ServiceManager {
@@ -251,6 +258,18 @@ impl AdminCtrl for ServiceManager {
 	}
 }
 
+struct DummyManager {}
+
+#[tonic::async_trait]
+impl CivkitService for DummyManager {
+	async fn register_service(&self, request: Request<civkitservice::RegisterRequest>) -> Result<Response<civkitservice::RegisterReply>, Status> {
+
+		println!("Received registration");
+
+		Ok(Response::new(civkitservice::RegisterReply { registration_result: 1 }))
+	}
+}
+
 #[derive(Parser, Debug)]
 struct Cli {
 	/// The port to listen for BOLT8 peers
@@ -347,6 +366,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 	let service_mngr_svc = Server::builder()
 		.add_service(AdminCtrlServer::new(service_manager))
+		.add_service(CivkitServiceServer::new(DummyManager {}))
 		.serve(addr);
 
 	let peer_manager = noise_gateway.peer_manager.clone();

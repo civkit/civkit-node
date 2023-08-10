@@ -1,0 +1,16 @@
+
+syntax = "proto3";
+
+package civkitservice;
+
+service CivkitService {
+	rpc RegisterService(RegisterRequest) returns (RegisterReply);
+}
+
+message RegisterRequest {
+	bytes service_pubkey = 1;
+}
+
+message RegisterReply {
+	uint64 registration_result = 1;
+}
