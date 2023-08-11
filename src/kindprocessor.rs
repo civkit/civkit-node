@@ -9,11 +9,16 @@
 
 //! An interface to sanitize and enforce service policy on the received notes.
 
+
+use nostr::Filter;
+
 use crate::events::ClientEvents;
 use crate::nostr_db::DbRequest;
 use crate::nostr_db::{write_new_subscription_db, write_new_event_db, write_new_client_db, print_events_db, print_clients_db, query_events_db};
 
 use std::sync::Mutex;
+
+use crate::util::is_replaceable;
 
 use tokio::sync::mpsc;
 use tokio::sync::Mutex as TokioMutex;
@@ -69,7 +74,17 @@ impl NoteProcessor {
 				let mut receive_db_requests_lock = self.receive_db_requests.lock();
 				if let Ok(db_request) = receive_db_requests_lock.await.try_recv() {
 					match db_request {
-						DbRequest::WriteEvent(ev) => { write_new_event_db(ev).await; },
+						DbRequest::WriteEvent(ev) => {
+							if is_replaceable(&ev) {
+								//TODO: build filter and replace event
+								//TODO: If two events have the same timestamp, the event with the lowest id SHOULD be retained, and the other discarded
+								let filter = Filter::new();
+								if let Ok(old_ev) = query_events_db(filter) {
+									//TODO: check if you should query for multiple replaced events
+									write_new_event_db(ev, Some(old_ev)).await;
+								}
+							} else { write_new_event_db(ev, None).await; }
+						},
 						DbRequest::WriteSub(ns) => { write_new_subscription_db(ns); },
 						DbRequest::WriteClient(ct) => { write_new_client_db(ct).await; },
 						DbRequest::ReplayEvents { client_id, filters } => { replay_request.push((client_id, filters)); },

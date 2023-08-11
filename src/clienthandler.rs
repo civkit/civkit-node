@@ -21,6 +21,7 @@ use crate::config::Config;
 use crate::{events, NostrSub, NostrClient};
 use crate::events::{ClientEvents, EventsProvider, ServerCmd};
 use crate::nostr_db::DbRequest;
+use crate::util::is_ephemeral;
 
 use futures_util::{future, pin_mut, TryStreamExt, StreamExt, SinkExt};
 
@@ -348,8 +349,10 @@ impl ClientHandler {
 								self.filter_events(*msg).await;
 								//TODO: we should link our filtering policy to our db storing,
 								//otherwise this is a severe DoS vector
-								let db_request = DbRequest::WriteEvent(*msg_2);
-								write_db.push(db_request);
+								if !is_ephemeral(&msg_2) {
+									let db_request = DbRequest::WriteEvent(*msg_2);
+									write_db.push(db_request);
+								}
 							},
 							ClientMessage::Req { subscription_id, filters } => {
 								self.subscriptions_counter += 1;

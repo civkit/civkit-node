@@ -1,3 +1,5 @@
+use nostr::Event;
+
 use log::LevelFilter;
 use simplelog::{CombinedLogger, ConfigBuilder, TermLogger, WriteLogger, TerminalMode};
 use std::error::Error;
@@ -54,4 +56,20 @@ pub fn init_logger(data_dir: &PathBuf, log_level: &str ) -> Result<(), Box<dyn E
 
     CombinedLogger::init(vec![file_logger, term_logger])
         .map_err(|err| Box::new(err) as Box<dyn Error + Send + Sync>)
+}
+
+// Function to assert if an event is a NIP-16 ephemeral event
+pub fn is_ephemeral(ev: &Event) -> bool {
+	if 20000 <= ev.kind.as_u32() && ev.kind.as_u32() < 30000 {
+		return false;
+	}
+	return true;
+}
+
+// Function to assert if an event is a NIP-16 repleceable event
+pub fn is_replaceable(ev: &Event) -> bool {
+	if 10000 <= ev.kind.as_u32() && ev.kind.as_u32() < 20000 {
+		return false;
+	}
+	return true;
 }
