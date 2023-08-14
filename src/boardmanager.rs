@@ -37,7 +37,6 @@ pub struct ServiceManager
 	//default_configuration: 
 	genesis_hash: BlockHash,
 
-	credential_gateway: Arc<CredentialGateway>,
 	//TODO: abstract ServiceProcessor, ServiceSigner and AnchorManager in its own Service component ?
 	node_signer: Arc<NodeSigner>,
 	anchor_manager: Arc<AnchorManager>,
@@ -54,12 +53,11 @@ pub struct ServiceManager
 
 impl ServiceManager
 {
-	pub fn new(credential_gateway: Arc<CredentialGateway>, node_signer: Arc<NodeSigner>, anchor_manager: Arc<AnchorManager>, board_events_send: mpsc::UnboundedSender<ClientEvents>, board_peers_send: mpsc::UnboundedSender<PeerInfo>, send_db_request: mpsc::UnboundedSender<DbRequest>, our_config: Config) -> Self {
+	pub fn new(node_signer: Arc<NodeSigner>, anchor_manager: Arc<AnchorManager>, board_events_send: mpsc::UnboundedSender<ClientEvents>, board_peers_send: mpsc::UnboundedSender<PeerInfo>, send_db_request: mpsc::UnboundedSender<DbRequest>, our_config: Config) -> Self {
 		let secp_ctx = Secp256k1::new();
 		let pubkey = PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[42;32]).unwrap());
 		ServiceManager {
 			genesis_hash: genesis_block(Network::Testnet).header.block_hash(),
-			credential_gateway,
 			anchor_manager,
 			node_signer,
 			service_events_send: Mutex::new(board_events_send),

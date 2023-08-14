@@ -326,7 +326,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let noise_gateway = NoiseGateway::new(gateway_receive);
 
 	// The staking credentials handler...quite empty for now.
-	let credential_gateway = Arc::new(CredentialGateway::new());
+	let mut credential_gateway = CredentialGateway::new();
 
 	// The note or service provider...quite empty for now.
 	let mut note_processor = NoteProcessor::new(processor_receive_dbrequests, receive_dbrequests_manager, send_db_result_handler);
@@ -341,7 +341,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests, handler_receive_db_result, config.clone());
 
 	// Main handler of services provision.
-	let board_manager = ServiceManager::new(credential_gateway, node_signer, anchor_manager, board_events_send, board_peer_send, manager_send_dbrequests, config.clone());
+	let board_manager = ServiceManager::new(node_signer, anchor_manager, board_events_send, board_peer_send, manager_send_dbrequests, config.clone());
 
 	let addr = format!("[::1]:{}", cli.cli_port).parse()?;
 
@@ -382,6 +382,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 		noise_gateway.run().await;
 	});
 
+	// We start the credentials gateway
+	// TODO: give a channel with ClientHandler
+	tokio::spawn(async move {
+		credential_gateway.run().await;
+	});
+
 	// We start the tcp listener for BOLT8 peers.
 	tokio::spawn(async move {
 		let listener = tokio::net::TcpListener::bind(format!("[::1]:{}", cli.noise_port)).await.expect("Failed to bind to listen port");
@@ -414,6 +420,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 			socket_connector.send((stream, addr));
 		}
 	});
+
 
 	loop {}
 
