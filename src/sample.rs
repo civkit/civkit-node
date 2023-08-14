@@ -12,7 +12,8 @@ use std::io;
 use std::io::Write;
 use std::process;
 
-use bitcoin::secp256k1::{PublicKey, SecretKey, Secp256k1};
+use bitcoin::secp256k1::{PublicKey, SecretKey, Secp256k1, Signature};
+use bitcoin::blockdata::transaction::Transaction;
 
 use nostr::{RelayMessage, EventBuilder, Metadata, Keys, ClientMessage, Kind, Filter, SubscriptionId, Timestamp};
 
@@ -26,6 +27,18 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message, tungstenite::error::Error};
 
 use std::str::FromStr;
+
+struct CredentialsHolder {
+	state: Vec<([u8; 32], Signature)>,
+}
+
+impl CredentialsHolder {
+	fn new() -> Self {
+		CredentialsHolder {
+			state: Vec::new(),
+		}
+	}
+}
 
 async fn poll_for_user_input(client_keys: Keys, tx: futures_channel::mpsc::UnboundedSender<Message>) {
 
@@ -122,6 +135,12 @@ fn cli() -> Command {
                 .help_template(APPLET_TEMPLATE)
                 .about("Close a subscription to the relay"),
         )
+	.subcommand(
+	    Command::new("submitcredentialproof")
+	    	.args([Arg::new("transaction").help("The transaction").required(true)])
+		.help_template(APPLET_TEMPLATE)
+		.about("Submit a credential proof to the relay"),
+	)
         .subcommand(
             Command::new("shutdown")
                 .help_template(APPLET_TEMPLATE)
@@ -224,6 +243,12 @@ fn respond(
             println!("Civkit sample exiting...");
             return Ok(true);
         }
+	Some(("submitcredentialproof", matches)) => {
+	    let transactionid: Option<&Transaction> = matches.get_one("transaction");
+	    //TODO: specifiy NOTICE 
+	    println!("Received submitcredentialproof");
+	    return Ok(true);
+	}
         _ => {
             println!("Unknown command");
             return Ok(true);
@@ -276,6 +301,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Init client state
     let keys = Keys::generate();
+
+    let credential_state = CredentialsHolder::new();
 
     let (stdin_tx, stdin_rx) = futures_channel::mpsc::unbounded();
     tokio::spawn(poll_for_user_input(keys, stdin_tx));
