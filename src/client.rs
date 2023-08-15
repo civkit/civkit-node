@@ -7,9 +7,9 @@
 // You may not use this file except in accordance with one or both of these
 // licenses.
 
-use boardctrl::board_ctrl_client::BoardCtrlClient;
+use adminctrl::admin_ctrl_client::AdminCtrlClient;
 //TODO: simplify by using prefix
-use boardctrl::{PingRequest, PongRequest, ShutdownRequest, ShutdownReply, SendNote, ReceivedNote, ListClientRequest, ListSubscriptionRequest, PeerConnectionRequest, DisconnectClientRequest, SendNotice, SendOffer, SendInvoice, ListDbEventsRequest, ListDbClientsRequest, ListDbClientsReply};
+use adminctrl::{PingRequest, PongRequest, ShutdownRequest, ShutdownReply, SendNote, ReceivedNote, ListClientRequest, ListSubscriptionRequest, PeerConnectionRequest, DisconnectClientRequest, SendNotice, SendOffer, SendInvoice, ListDbEventsRequest, ListDbClientsRequest, ListDbClientsReply};
 
 use std::env;
 use std::process;
@@ -31,8 +31,8 @@ use tokio::time::Duration;
 
 use clap::{Parser, Subcommand};
 
-pub mod boardctrl {
-	tonic::include_proto!("boardctrl");
+pub mod adminctrl {
+	tonic::include_proto!("adminctrl");
 }
 
 #[derive(Parser, Debug)]
@@ -85,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let cli = Cli::parse();
 
-	let mut client = BoardCtrlClient::connect(format!("http://[::1]:{}", cli.port)).await?;
+	let mut client = AdminCtrlClient::connect(format!("http://[::1]:{}", cli.port)).await?;
 
 	match cli.command {
 		Command::Ping => {

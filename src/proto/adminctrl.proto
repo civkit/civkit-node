@@ -1,9 +1,9 @@
 
 syntax = "proto3";
 
-package boardctrl;
+package adminctrl;
 
-service BoardCtrl {
+service AdminCtrl {
 	rpc PingHandle (PingRequest) returns (PongRequest);
 	rpc ShutdownHandle (ShutdownRequest) returns (ShutdownReply);
 	/* NIP 01 from client to relay - EVENT: Kind 1 `text_note` */
@@ -12,7 +12,7 @@ service BoardCtrl {
 	rpc ListSubscriptions (ListSubscriptionRequest) returns (ListSubscriptionReply);
 	rpc ConnectPeer (PeerConnectionRequest) returns (PeerConnectionReply);
 	rpc ListPeers (ListPeersRequest) returns (ListPeersReply);
-	rpc StatusHandle (BoardStatusRequest) returns (BoardStatusReply);
+	rpc RelayStatusHandle (ServiceMngrStatusRequest) returns (ServiceMngrStatusReply);
 	rpc DisconnectClient (DisconnectClientRequest) returns (DisconnectClientReply);
 	/* NIP 01 - from relay to client: NOTICE */
 	rpc PublishNotice (SendNotice) returns (ReceivedNotice);
@@ -81,10 +81,10 @@ message ListPeersReply {
 	uint64 peers = 1;
 }
 
-message BoardStatusRequest {
+message ServiceMngrStatusRequest {
 }
 
-message BoardStatusReply {
+message ServiceMngrStatusReply {
 	uint64 offers = 1;
 }
 

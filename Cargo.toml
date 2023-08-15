@@ -18,6 +18,10 @@ path = "src/client.rs"
 name = "civkit-sample"
 path = "src/sample.rs"
 
+[[bin]]
+name = "civkit-marketd"
+path = "src/services/marketd.rs"
+
 [dependencies]
 futures-channel = "0.3.28"
 futures-util = "0.3.28"
