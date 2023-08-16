@@ -191,7 +191,7 @@ impl AdminCtrl for ServiceManager {
 
 		{
 			let mut service_mngr_send_lock = self.service_events_send.lock().unwrap();
-			service_mngr_send_lock.send(ClientEvents::RelayNotice { message: notice_message });
+			service_mngr_send_lock.send(ClientEvents::RelayNotice { client_id: 0, message: notice_message });
 		}
 
 		let received_note = adminctrl::ReceivedNote {
