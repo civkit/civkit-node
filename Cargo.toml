@@ -45,6 +45,7 @@ rusqlite = "0.29.0"
 simplelog = "0.7.1"
 dirs = "3.0.1"
 log = "0.4.14"
+staking_credentials = { git = "https://github.com/civkit/staking-credentials.git", branch = "main" }
 
 
 [build-dependencies]

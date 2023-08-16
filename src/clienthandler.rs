@@ -22,6 +22,8 @@ use crate::{events, NostrSub, NostrClient};
 use crate::events::{ClientEvents, EventsProvider, ServerCmd};
 use crate::nostr_db::DbRequest;
 
+use staking_credentials::common::msgs::CredentialPolicy;
+
 use futures_util::{future, pin_mut, TryStreamExt, StreamExt, SinkExt};
 
 use tokio::net::TcpStream;
@@ -202,7 +204,9 @@ impl ClientHandler {
 								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending note"); }
 							}
 						},
-						ClientEvents::RelayNotice { ref message } => {
+						ClientEvents::RelayNotice { ref client_id, ref message } => {
+							if id != client_id { continue }
+
 							//TODO: implement `requestcredential` announcement
 							let relay_message = RelayMessage::new_notice(message);
 							let serialized_message = relay_message.as_json();
@@ -301,6 +305,8 @@ impl ClientHandler {
 
 			let mut write_db = Vec::new();
 
+			let mut new_pending_events = Vec::new();
+
 			if let Some((addr, outgoing_send, incoming_receive)) = socket_and_sender {
 				self.clients_counter += 1;
 				let client_id = self.clients_counter;
@@ -317,6 +323,12 @@ impl ClientHandler {
 				}
 				let db_request = DbRequest::WriteClient(client_2);
 				write_db.push(db_request);
+				//TODO: serialize CredentialPolicy as message notice
+				let message = String::new();
+				let relay_message = RelayMessage::new_notice(message);
+				let serialized_message = relay_message.as_json();
+				let notice_event = ClientEvents::RelayNotice { client_id: client_id,  message: serialized_message };
+				new_pending_events.push(notice_event);
 			}
 
 			let mut msg_queue = Vec::new();
@@ -330,7 +342,6 @@ impl ClientHandler {
 				}
 			}
 
-			let mut new_pending_events = Vec::new();
 			{
 				// If we have a new event, we'll fan out according to its types (event, subscription, close)
 				for (id, msg) in msg_queue {
