@@ -49,7 +49,7 @@ struct DbClient {
 	data: Option<Vec<u8>>,
 }
 
-pub async fn write_new_event_db(event: Event) {
+pub async fn write_new_event_db(event: Event, old_event: Option<Vec<Event>>) {
 
 	//TODO: spawn new thread
 	if let Ok(mut conn) = Connection::open_with_flags(
