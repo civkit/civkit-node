@@ -17,6 +17,8 @@ use bitcoin::network::constants::Network;
 use bitcoin::secp256k1::Secp256k1;
 use bitcoin::secp256k1;
 
+use staking_credentials::issuance::issuerstate::IssuerState;
+
 use tokio::time::{sleep, Duration};
 
 #[derive(Copy, Clone, Debug)]
@@ -37,22 +39,29 @@ impl Default for GatewayConfig {
 	}
 }
 
+struct IssuanceManager {
+}
+
 pub struct CredentialGateway {
 	genesis_hash: BlockHash,
 
 	default_config: GatewayConfig,
 
 	secp_ctx: Secp256k1<secp256k1::All>,
+
+	issuance_manager: IssuanceManager,
 }
 
 impl CredentialGateway {
 	pub fn new() -> Self {
 		let secp_ctx = Secp256k1::new();
 		//TODO: should be given a path to bitcoind to use the wallet
+		let issuance_manager = IssuanceManager {};
 		CredentialGateway {
 			genesis_hash: genesis_block(Network::Testnet).header.block_hash(),
 			default_config: GatewayConfig::default(),
 			secp_ctx,
+			issuance_manager: issuance_manager,
 		}
 	}
 
@@ -61,6 +70,8 @@ impl CredentialGateway {
 			sleep(Duration::from_millis(1000)).await;
 
 			println!("[CIVKITD] - CREDENTIALS: CredentialGateway ready for validation");
+
+			
 		}
 	}
 }
