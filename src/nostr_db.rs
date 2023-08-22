@@ -49,7 +49,7 @@ struct DbClient {
 	data: Option<Vec<u8>>,
 }
 
-pub async fn write_new_event_db(event: Event, old_event: Option<Vec<Event>>) {
+pub async fn write_new_event_db(event: Event, old_event: Option<Vec<Event>>) -> bool {
 
 	//TODO: spawn new thread
 	if let Ok(mut conn) = Connection::open_with_flags(
@@ -89,7 +89,9 @@ pub async fn write_new_event_db(event: Event, old_event: Option<Vec<Event>>) {
 		}
 
 		conn.close().ok();
+		return true;
 	} else { println!("Failure to open database"); }
+	return false;
 }
 
 pub async fn print_events_db() {

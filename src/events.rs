@@ -12,7 +12,7 @@
 
 use crate::NostrClient;
 
-use nostr::{Event, SubscriptionId};
+use nostr::{Event, EventId, SubscriptionId};
 
 use tokio::sync::oneshot;
 
@@ -25,6 +25,7 @@ pub enum ClientEvents {
 	EndOfStoredEvents { client_id: u64, sub_id: SubscriptionId },
 	RelayNotice { client_id: u64, message: String },
 	SubscribedEvent { client_id: u64, sub_id: SubscriptionId, event: Event },
+	OkEvent { event_id: EventId, ret: bool, msg: Option<String> },
 }
 
 #[derive(Debug)]

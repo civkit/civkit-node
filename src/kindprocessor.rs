@@ -70,11 +70,13 @@ impl NoteProcessor {
 			sleep(Duration::from_millis(1000)).await;
 
 			let mut replay_request = Vec::new();
+			let mut ok_events = Vec::new();
 			{
 				let mut receive_db_requests_lock = self.receive_db_requests.lock();
 				if let Ok(db_request) = receive_db_requests_lock.await.try_recv() {
 					match db_request {
 						DbRequest::WriteEvent(ev) => {
+							let event_id = ev.id;
 							if is_replaceable(&ev) {
 								//TODO: build filter and replace event
 								//TODO: If two events have the same timestamp, the event with the lowest id SHOULD be retained, and the other discarded
@@ -83,7 +85,10 @@ impl NoteProcessor {
 									//TODO: check if you should query for multiple replaced events
 									write_new_event_db(ev, Some(old_ev)).await;
 								}
-							} else { write_new_event_db(ev, None).await; }
+							} else {
+								let ret = write_new_event_db(ev, None).await;
+								if ret { ok_events.push(event_id); }
+							}
 						},
 						DbRequest::WriteSub(ns) => { write_new_subscription_db(ns); },
 						DbRequest::WriteClient(ct) => { write_new_client_db(ct).await; },
@@ -121,6 +126,12 @@ impl NoteProcessor {
 				let mut send_db_result_handler_lock = self.send_db_result_handler.lock();
 				let stored_event = ClientEvents::StoredEvent { client_id: ret.0, events: ret.1 };
 				send_db_result_handler_lock.await.send(stored_event);
+			}
+
+			for ev in ok_events {
+				let mut send_db_result_handler_lock = self.send_db_result_handler.lock();
+				let ok_event = ClientEvents::OkEvent { event_id: ev, ret: true, msg: None };
+				send_db_result_handler_lock.await.send(ok_event);
 			}
 		}
 	}
