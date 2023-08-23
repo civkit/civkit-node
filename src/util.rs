@@ -1,5 +1,9 @@
 use nostr::Event;
 
+use serde_json::json;
+
+use bitcoin::secp256k1::{PublicKey, SecretKey, Secp256k1};
+
 use log::LevelFilter;
 use simplelog::{CombinedLogger, ConfigBuilder, TermLogger, WriteLogger, TerminalMode};
 use std::error::Error;
@@ -72,4 +76,19 @@ pub fn is_replaceable(ev: &Event) -> bool {
 		return true;
 	}
 	return false;
+}
+
+pub fn get_relay_info() -> String {
+	//TODO: give config
+	let secp_ctx = Secp256k1::new();
+	let pubkey = PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[42;32]).unwrap());
+	let relay_info = json!({
+		"name": "CIVKIT TEST",
+		"description": "",
+		"pubkey": pubkey.serialize()[..],
+		"contact": "",
+		"software": "civkitd",
+		"version": "v0.0.2"
+	});
+	relay_info.to_string()
 }
