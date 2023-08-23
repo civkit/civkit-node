@@ -19,6 +19,8 @@ use bitcoin::secp256k1;
 
 use staking_credentials::issuance::issuerstate::IssuerState;
 
+use crate::bitcoind_client::BitcoindClient;
+
 use tokio::time::{sleep, Duration};
 
 #[derive(Copy, Clone, Debug)]
@@ -43,6 +45,8 @@ struct IssuanceManager {
 }
 
 pub struct CredentialGateway {
+	bitcoind_client: BitcoindClient,
+
 	genesis_hash: BlockHash,
 
 	default_config: GatewayConfig,
@@ -54,10 +58,12 @@ pub struct CredentialGateway {
 
 impl CredentialGateway {
 	pub fn new() -> Self {
+		let bitcoind_client = BitcoindClient::new(String::new(), 0, String::new(), String::new());
 		let secp_ctx = Secp256k1::new();
 		//TODO: should be given a path to bitcoind to use the wallet
 		let issuance_manager = IssuanceManager {};
 		CredentialGateway {
+			bitcoind_client: bitcoind_client,
 			genesis_hash: genesis_block(Network::Testnet).header.block_hash(),
 			default_config: GatewayConfig::default(),
 			secp_ctx,
