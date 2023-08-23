@@ -21,7 +21,7 @@ use crate::config::Config;
 use crate::{events, NostrSub, NostrClient};
 use crate::events::{ClientEvents, EventsProvider, ServerCmd};
 use crate::nostr_db::DbRequest;
-use crate::util::is_ephemeral;
+use crate::util::{is_ephemeral, get_relay_info};
 
 use staking_credentials::common::msgs::CredentialPolicy;
 
@@ -333,9 +333,8 @@ impl ClientHandler {
 				}
 				let db_request = DbRequest::WriteClient(client_2);
 				write_db.push(db_request);
-				//TODO: serialize CredentialPolicy as message notice
-				let message = String::new();
-				let relay_message = RelayMessage::new_notice(message);
+				let relay_info = get_relay_info();
+				let relay_message = RelayMessage::new_notice(relay_info);
 				let serialized_message = relay_message.as_json();
 				let notice_event = ClientEvents::RelayNotice { client_id: client_id,  message: serialized_message };
 				new_pending_events.push(notice_event);
