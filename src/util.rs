@@ -61,15 +61,15 @@ pub fn init_logger(data_dir: &PathBuf, log_level: &str ) -> Result<(), Box<dyn E
 // Function to assert if an event is a NIP-16 ephemeral event
 pub fn is_ephemeral(ev: &Event) -> bool {
 	if 20000 <= ev.kind.as_u32() && ev.kind.as_u32() < 30000 {
-		return false;
+		return true;
 	}
-	return true;
+	return false;
 }
 
 // Function to assert if an event is a NIP-16 repleceable event
 pub fn is_replaceable(ev: &Event) -> bool {
 	if 10000 <= ev.kind.as_u32() && ev.kind.as_u32() < 20000 {
-		return false;
+		return true;
 	}
-	return true;
+	return false;
 }

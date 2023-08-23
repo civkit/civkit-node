@@ -245,6 +245,15 @@ impl ClientHandler {
 								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending end of stored events"); },
 							}
 						},
+						ClientEvents::OkEvent { ref event_id, ref ret, ref msg } => {
+							let msg_str = if msg.is_none() { String::new() } else { msg.clone().unwrap() };
+							let relay_message = RelayMessage::new_ok(*event_id, *ret, msg_str);
+							let serialized_message = relay_message.as_json();
+							match outgoing_send.send(serialized_message.into_bytes()) {
+								Ok(_) => {},
+								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending ok event"); },
+							}
+						},
 						_ => {}
 					}
 				}

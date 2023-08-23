@@ -282,9 +282,14 @@ async fn poll_for_server_output(mut rx: futures_channel::mpsc::UnboundedReceiver
                             println!("\n[EOSE] {}", sub_id);
                             print!("> ");
                             io::stdout().flush().unwrap();
-					},
-					_ => { println!("Unknown server message"); }
-                        }
+			},
+			RelayMessage::Ok { event_id, status, message } => {
+			     println!("[OK] event_id {} status {} message {}", event_id, status, message);
+			     print!("> ");
+                            io::stdout().flush().unwrap();
+			},
+			_ => { println!("Unknown server message"); }
+		    }
 		} else { println!("RelayMessage deserialization failure"); }
         }
     }
