@@ -21,7 +21,7 @@ use crate::config::Config;
 use crate::{events, NostrSub, NostrClient};
 use crate::events::{ClientEvents, EventsProvider, ServerCmd};
 use crate::nostr_db::DbRequest;
-use crate::util::is_ephemeral;
+use crate::util::{is_ephemeral, is_credential};
 
 use staking_credentials::common::msgs::CredentialPolicy;
 
@@ -366,6 +366,10 @@ impl ClientHandler {
 									}
 								}
 								let msg_2 = msg.clone();
+								if is_credential(&msg_2) {
+									println!("[CIVKITD] - NOSTR: credential msg received");
+									//TODO: send to credential handler
+								}
 								self.filter_events(*msg).await;
 								//TODO: we should link our filtering policy to our db storing,
 								//otherwise this is a severe DoS vector

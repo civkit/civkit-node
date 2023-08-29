@@ -69,7 +69,6 @@ impl CredentialGateway {
 		loop {
 			sleep(Duration::from_millis(1000)).await;
 
-			println!("[CIVKITD] - CREDENTIALS: CredentialGateway ready for validation");
 
 			
 		}

@@ -73,3 +73,11 @@ pub fn is_replaceable(ev: &Event) -> bool {
 	}
 	return false;
 }
+
+// Function to assert if an event is a credential msg
+pub fn is_credential(ev: &Event) -> bool {
+	if 3250 <= ev.kind.as_u32() && ev.kind.as_u32() < 3252 {
+		return true;
+	}
+	return false;
+}
