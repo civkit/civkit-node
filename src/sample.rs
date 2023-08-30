@@ -14,6 +14,7 @@ use std::process;
 
 use bitcoin::secp256k1::{PublicKey, SecretKey, Secp256k1, Signature};
 use bitcoin::blockdata::transaction::Transaction;
+use bitcoin::hash_types::Txid;
 
 use nostr::{RelayMessage, EventBuilder, Metadata, Keys, ClientMessage, Kind, Filter, SubscriptionId, Timestamp};
 
@@ -137,7 +138,7 @@ fn cli() -> Command {
         )
 	.subcommand(
 	    Command::new("submitcredentialproof")
-	    	.args([Arg::new("transaction").help("The transaction").required(true)])
+	    	.args([Arg::new("txid").help("The transaction id").required(true)])
 		.help_template(APPLET_TEMPLATE)
 		.about("Submit a credential proof to the relay"),
 	)
@@ -244,10 +245,16 @@ fn respond(
             return Ok(true);
         }
 	Some(("submitcredentialproof", matches)) => {
-	    let transactionid: Option<&Transaction> = matches.get_one("transaction");
-	    //TODO: specifiy NOTICE 
-	    println!("Received submitcredentialproof");
-	    return Ok(true);
+	    let transactionid: Option<&String> = matches.get_one("txid");
+	    let content = String::new();
+	    if let Ok(kind_3250_event) =
+		EventBuilder::new_credential_request(content, &[]).to_event(client_keys)
+	    {
+	        let client_message = ClientMessage::new_event(kind_3250_event);
+		let serialized_message = client_message.as_json();
+		tx.unbounded_send(Message::text(serialized_message))
+		    .unwrap();
+	    }
 	}
         _ => {
             println!("Unknown command");
