@@ -70,6 +70,8 @@ pub struct ClientHandler {
 	send_db_requests: Mutex<mpsc::UnboundedSender<DbRequest>>,
 	handler_receive_db_result: Mutex<mpsc::UnboundedReceiver<ClientEvents>>,
 
+	send_credential_events_handler: Mutex<mpsc::UnboundedSender<ClientEvents>>,
+
 	filtered_events: HashMap<SubscriptionId, Event>,
 
 	pending_events: Mutex<Vec<ClientEvents>>,
@@ -119,7 +121,7 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, outgoing_rec
 }
 
 impl ClientHandler {
-	pub fn new(handler_receive: mpsc::UnboundedReceiver<ClientEvents>, connection_receive: mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>, send_db_requests: mpsc::UnboundedSender<DbRequest>, handler_receive_db_result: mpsc::UnboundedReceiver<ClientEvents>, our_config: Config) -> Self {
+	pub fn new(handler_receive: mpsc::UnboundedReceiver<ClientEvents>, connection_receive: mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>, send_db_requests: mpsc::UnboundedSender<DbRequest>, handler_receive_db_result: mpsc::UnboundedReceiver<ClientEvents>, send_credential_events_handler: mpsc::UnboundedSender<ClientEvents>, our_config: Config) -> Self {
 
 		let (outgoing_receive, incoming_receive) = mpsc::unbounded_channel::<Vec<u8>>();
 
@@ -138,6 +140,8 @@ impl ClientHandler {
 
 			send_db_requests: Mutex::new(send_db_requests),
 			handler_receive_db_result: Mutex::new(handler_receive_db_result),
+
+			send_credential_events_handler: Mutex::new(send_credential_events_handler),
 
 			filtered_events: HashMap::new(),
 

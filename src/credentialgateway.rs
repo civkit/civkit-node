@@ -19,9 +19,12 @@ use bitcoin::secp256k1;
 
 use staking_credentials::issuance::issuerstate::IssuerState;
 
+use crate::events::ClientEvents;
 use crate::bitcoind_client::BitcoindClient;
 
 use tokio::time::{sleep, Duration};
+use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 
 #[derive(Copy, Clone, Debug)]
 struct GatewayConfig {
@@ -53,11 +56,13 @@ pub struct CredentialGateway {
 
 	secp_ctx: Secp256k1<secp256k1::All>,
 
+	receive_credential_event_gateway: Mutex<mpsc::UnboundedReceiver<ClientEvents>>,
+
 	issuance_manager: IssuanceManager,
 }
 
 impl CredentialGateway {
-	pub fn new() -> Self {
+	pub fn new(receive_credential_event_gateway: mpsc::UnboundedReceiver<ClientEvents>) -> Self {
 		let bitcoind_client = BitcoindClient::new(String::new(), 0, String::new(), String::new());
 		let secp_ctx = Secp256k1::new();
 		//TODO: should be given a path to bitcoind to use the wallet
@@ -67,6 +72,7 @@ impl CredentialGateway {
 			genesis_hash: genesis_block(Network::Testnet).header.block_hash(),
 			default_config: GatewayConfig::default(),
 			secp_ctx,
+			receive_credential_event_gateway: Mutex::new(receive_credential_event_gateway),
 			issuance_manager: issuance_manager,
 		}
 	}
