@@ -26,6 +26,7 @@ pub enum ClientEvents {
 	RelayNotice { client_id: u64, message: String },
 	SubscribedEvent { client_id: u64, sub_id: SubscriptionId, event: Event },
 	OkEvent { event_id: EventId, ret: bool, msg: Option<String> },
+	Credential { client_id: u64, event: Event },
 }
 
 #[derive(Debug)]
