@@ -17,6 +17,8 @@ use bitcoin::network::constants::Network;
 use bitcoin::secp256k1::Secp256k1;
 use bitcoin::secp256k1;
 
+use nostr::Event;
+
 use staking_credentials::issuance::issuerstate::IssuerState;
 
 use crate::events::ClientEvents;
@@ -25,6 +27,8 @@ use crate::bitcoind_client::BitcoindClient;
 use tokio::time::{sleep, Duration};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
+
+use std::collections::HashMap;
 
 #[derive(Copy, Clone, Debug)]
 struct GatewayConfig {
@@ -45,6 +49,15 @@ impl Default for GatewayConfig {
 }
 
 struct IssuanceManager {
+	request_counter: u64,
+	table_signing_requests: HashMap<u64, u64> //TODO: add Txid
+}
+
+impl IssuanceManager {
+	fn register_signing_request(&mut self, client_id: u64, ev: Event) {
+		self.table_signing_requests.insert(self.request_counter, client_id);
+		self.request_counter += 1;
+	}
 }
 
 pub struct CredentialGateway {
@@ -66,7 +79,10 @@ impl CredentialGateway {
 		let bitcoind_client = BitcoindClient::new(String::new(), 0, String::new(), String::new());
 		let secp_ctx = Secp256k1::new();
 		//TODO: should be given a path to bitcoind to use the wallet
-		let issuance_manager = IssuanceManager {};
+		let issuance_manager = IssuanceManager {
+			request_counter: 0,
+			table_signing_requests: HashMap::new(),
+		};
 		CredentialGateway {
 			bitcoind_client: bitcoind_client,
 			genesis_hash: genesis_block(Network::Testnet).header.block_hash(),
@@ -81,8 +97,27 @@ impl CredentialGateway {
 		loop {
 			sleep(Duration::from_millis(1000)).await;
 
+			let mut credential_queue = Vec::new();
+			{
+				let mut receive_credential_event_gateway_lock = self.receive_credential_event_gateway.lock();
+				if let Ok(credential_event) = receive_credential_event_gateway_lock.await.try_recv() {
+					println!("[CIVKITD] - CREDENTIAL: credential received for processing");
+					credential_queue.push(credential_event);
+				}
+			}
 
-			
+			for event in credential_queue {
+				match event {
+					ClientEvents::Credential { client_id, event } => {
+						self.issuance_manager.register_signing_request(client_id, event);
+					},
+					_ => {},
+				}
+			}
+
+			{
+				//TODO: send txid query to BitcoindClient
+			}
 		}
 	}
 }
