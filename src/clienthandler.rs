@@ -318,6 +318,7 @@ impl ClientHandler {
 			}
 
 			let mut write_db = Vec::new();
+			let mut verify_credentials_queue = Vec::new();
 
 			let mut new_pending_events = Vec::new();
 
@@ -372,7 +373,9 @@ impl ClientHandler {
 								let msg_2 = msg.clone();
 								if is_credential(&msg_2) {
 									println!("[CIVKITD] - NOSTR: credential msg received");
-									//TODO: send to credential handler
+									let credential_verification_event = ClientEvents::CredentialVerification { client_id: id, event: *msg };
+									verify_credentials_queue.push(credential_verification_event);
+									continue;
 								}
 								self.filter_events(*msg).await;
 								//TODO: we should link our filtering policy to our db storing,
@@ -419,12 +422,18 @@ impl ClientHandler {
 			}
 
 			{
+				for credential in verify_credentials_queue {
+					let mut send_credential_event_handler_lock = self.send_credential_events_handler.lock();
+					send_credential_event_handler_lock.await.send(credential);
+				}
+			}
+
+			{
 				for ev in write_db {
 					let mut send_db_requests_lock = self.send_db_requests.lock();
 					send_db_requests_lock.await.send(ev);
 				}
 			}
-
 
 			{
 				let mut pending_events_lock = self.pending_events.lock();

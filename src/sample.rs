@@ -246,6 +246,7 @@ fn respond(
         }
 	Some(("submitcredentialproof", matches)) => {
 	    let transactionid: Option<&String> = matches.get_one("txid");
+	    //TODO: introduce RequesterPayload { asset, proof }
 	    let content = String::new();
 	    if let Ok(kind_3250_event) =
 		EventBuilder::new_credential_request(content, &[]).to_event(client_keys)

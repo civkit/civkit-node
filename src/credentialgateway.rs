@@ -47,6 +47,12 @@ impl Default for GatewayConfig {
 struct IssuanceManager {
 }
 
+impl IssuanceManager {
+	fn process_requester_payload() -> bool {
+		return true;
+	}
+}
+
 pub struct CredentialGateway {
 	bitcoind_client: BitcoindClient,
 
@@ -81,8 +87,13 @@ impl CredentialGateway {
 		loop {
 			sleep(Duration::from_millis(1000)).await;
 
-
-			
+			let mut client_events = Vec::new();
+			{
+				let mut receive_credential_event_gateway_lock = self.receive_credential_event_gateway.lock();
+				if let Ok(event) = receive_credential_event_gateway_lock.await.try_recv() {
+					client_events.push(event);
+				}
+			}
 		}
 	}
 }
