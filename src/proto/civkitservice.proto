@@ -5,6 +5,8 @@ package civkitservice;
 
 service CivkitService {
 	rpc RegisterService(RegisterRequest) returns (RegisterReply);
+	rpc FetchServiceEvent(FetchRequest) returns (FetchReply);
+	rpc SubmitServiceEvent(SubmitRequest) returns (SubmitReply);
 }
 
 message RegisterRequest {
@@ -13,4 +15,16 @@ message RegisterRequest {
 
 message RegisterReply {
 	uint64 registration_result = 1;
+}
+
+message FetchRequest {
+}
+
+message FetchReply {
+}
+
+message SubmitRequest {
+}
+
+message SubmitReply {
 }

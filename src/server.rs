@@ -268,6 +268,20 @@ impl CivkitService for DummyManager {
 
 		Ok(Response::new(civkitservice::RegisterReply { registration_result: 1 }))
 	}
+
+	async fn fetch_service_event(&self, request: Request<civkitservice::FetchRequest>) -> Result<Response<civkitservice::FetchReply>, Status> {
+
+		println!("Received fetch service");
+
+		Ok(Response::new(civkitservice::FetchReply {}))
+	}
+
+	async fn submit_service_event(&self, request: Request<civkitservice::SubmitRequest>) -> Result<Response<civkitservice::SubmitReply>, Status> {
+
+		println!("Submit service");
+
+		Ok(Response::new(civkitservice::SubmitReply {}))
+	}
 }
 
 #[derive(Parser, Debug)]
