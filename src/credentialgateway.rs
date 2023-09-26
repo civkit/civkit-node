@@ -10,15 +10,17 @@
 //! The componnent managing the reception of staking credentials and zap
 //! notes to ensure notes are not wasting CivKit node ressources.
 
-use bitcoin::BlockHash;
+use bitcoin::{BlockHash, Txid};
 use bitcoin::blockdata::constants::genesis_block;
+use bitcoin::hashes::{sha256d, Hash, HashEngine};
 use bitcoin::network::constants::Network;
 
-use bitcoin::secp256k1::Secp256k1;
+use bitcoin::secp256k1::{PublicKey, SecretKey, Secp256k1};
 use bitcoin::secp256k1;
 
 use nostr::Event;
 
+use staking_credentials::common::msgs::{AssetProofFeatures, CredentialsFeatures};
 use staking_credentials::issuance::issuerstate::IssuerState;
 
 use crate::events::ClientEvents;
@@ -50,13 +52,29 @@ impl Default for GatewayConfig {
 
 struct IssuanceManager {
 	request_counter: u64,
-	table_signing_requests: HashMap<u64, u64> //TODO: add Txid
+	table_signing_requests: HashMap<u64, u64>,//TODO: add Txid
+
+	issuance_engine: IssuerState,
 }
 
 impl IssuanceManager {
-	fn register_signing_request(&mut self, client_id: u64, ev: Event) {
+	fn register_authentication_request(&mut self, client_id: u64, ev: Event) -> Result<(u64, Txid), ()> {
+		let request_id = self.request_counter;
 		self.table_signing_requests.insert(self.request_counter, client_id);
 		self.request_counter += 1;
+
+		//TODO: verify we hash 32 byte from event
+		let mut enc = Txid::engine();
+		enc.input(ev.content.as_bytes());
+		//TODO: verify we support the proof and credentials
+		Ok((request_id, Txid::from_engine(enc)))
+	}
+
+	fn validate_authentication_request(&mut self, request_id: u64, result: bool) -> Result<(), ()> {
+		if let Some(request) = self.table_signing_requests.get(&request_id) {
+			//if let Ok(self.issuer_state.authenticate_credentials(request);
+		}
+		Ok(())
 	}
 }
 
@@ -79,9 +97,19 @@ impl CredentialGateway {
 		let bitcoind_client = BitcoindClient::new(String::new(), 0, String::new(), String::new());
 		let secp_ctx = Secp256k1::new();
 		//TODO: should be given a path to bitcoind to use the wallet
+
+		let secp_ctx = Secp256k1::new();
+		let pubkey = PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[42;32]).unwrap());
+
+		let asset_proof_features = AssetProofFeatures::new(vec![]);
+		let credentials_features = CredentialsFeatures::new(vec![]);
+
+		let issuer_state = IssuerState::new(asset_proof_features, credentials_features, pubkey);
+
 		let issuance_manager = IssuanceManager {
 			request_counter: 0,
 			table_signing_requests: HashMap::new(),
+			issuance_engine: issuer_state,
 		};
 		CredentialGateway {
 			bitcoind_client: bitcoind_client,
@@ -106,18 +134,30 @@ impl CredentialGateway {
 				}
 			}
 
+			let mut proofs_to_verify = Vec::new();
 			for event in credential_queue {
 				match event {
 					ClientEvents::Credential { client_id, event } => {
-						self.issuance_manager.register_signing_request(client_id, event);
+						//TODO: check if the event is a credential authentication or service request
+						if let Ok(txid) = self.issuance_manager.register_authentication_request(client_id, event) {
+							println!("[CIVKITD] - CREDENTIAL: txid to verify");
+							proofs_to_verify.push(txid);
+						}
 					},
 					_ => {},
 				}
 			}
 
-			{
+			let mut validated_requests = Vec::new();
+			for (request_id, proof) in proofs_to_verify {
 				//TODO: send txid query to BitcoindClient
 			}
+
+			for (request_id, validation_result) in validated_requests {
+				self.issuance_manager.validate_authentication_request(request_id, validation_result);
+			}
+
+			//TODO: broadcast back events to client gateway
 		}
 	}
 }
