@@ -354,6 +354,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 	let (send_credential_events_handler, receive_credential_event_gateway) = mpsc::unbounded_channel::<ClientEvents>();
 
+	let (send_credential_events_gateway, receive_credential_event_handler) = mpsc::unbounded_channel::<ClientEvents>();
+
 	// The onion message handler...quite empty for now.
 	let onion_box = OnionBox::new();
 
@@ -361,7 +363,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let noise_gateway = NoiseGateway::new(gateway_receive);
 
 	// The staking credentials handler...quite empty for now.
-	let mut credential_gateway = CredentialGateway::new(receive_credential_event_gateway);
+	let mut credential_gateway = CredentialGateway::new(receive_credential_event_gateway, send_credential_events_gateway);
 
 	// The note or service provider...quite empty for now.
 	let mut note_processor = NoteProcessor::new(processor_receive_dbrequests, receive_dbrequests_manager, send_db_result_handler);
@@ -373,6 +375,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let anchor_manager = Arc::new(AnchorManager::new());
 
 	// Main handler of Nostr connections.
+	// TODO: add receive_credential_events_handler
 	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests, handler_receive_db_result, send_credential_events_handler, config.clone());
 
 	// Main handler of services provision.
