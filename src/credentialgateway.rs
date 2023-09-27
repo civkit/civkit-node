@@ -18,10 +18,12 @@ use bitcoin::network::constants::Network;
 use bitcoin::secp256k1::{PublicKey, SecretKey, Secp256k1};
 use bitcoin::secp256k1;
 
-use nostr::Event;
+use nostr::{Event, Kind};
 
 use staking_credentials::common::msgs::{AssetProofFeatures, CredentialsFeatures};
 use staking_credentials::issuance::issuerstate::IssuerState;
+
+use staking_credentials::common::msgs::ServiceDeliveranceResult;
 
 use crate::events::ClientEvents;
 use crate::bitcoind_client::BitcoindClient;
@@ -78,6 +80,21 @@ impl IssuanceManager {
 	}
 }
 
+struct RedemptionManager { }
+
+impl RedemptionManager {
+	fn validate_service_deliverance(&mut self, client_id: u64, ev: Event) -> Result<ServiceDeliveranceResult, ()> {
+
+		let service_id = 0;
+		let ret = false;
+		let reason = vec![];
+
+		let mut service_deliverance_result = ServiceDeliveranceResult::new(service_id, ret, reason);
+
+		Ok(service_deliverance_result)
+	}
+}
+
 pub struct CredentialGateway {
 	bitcoind_client: BitcoindClient,
 
@@ -88,12 +105,14 @@ pub struct CredentialGateway {
 	secp_ctx: Secp256k1<secp256k1::All>,
 
 	receive_credential_event_gateway: Mutex<mpsc::UnboundedReceiver<ClientEvents>>,
+	send_credential_events_gateway: Mutex<mpsc::UnboundedSender<ClientEvents>>,
 
 	issuance_manager: IssuanceManager,
+	redemption_manager: RedemptionManager,
 }
 
 impl CredentialGateway {
-	pub fn new(receive_credential_event_gateway: mpsc::UnboundedReceiver<ClientEvents>) -> Self {
+	pub fn new(receive_credential_event_gateway: mpsc::UnboundedReceiver<ClientEvents>, send_credential_events_gateway: mpsc::UnboundedSender<ClientEvents>) -> Self {
 		let bitcoind_client = BitcoindClient::new(String::new(), 0, String::new(), String::new());
 		let secp_ctx = Secp256k1::new();
 		//TODO: should be given a path to bitcoind to use the wallet
@@ -111,13 +130,20 @@ impl CredentialGateway {
 			table_signing_requests: HashMap::new(),
 			issuance_engine: issuer_state,
 		};
+
+		let redemption_manager = RedemptionManager {
+
+		};
+
 		CredentialGateway {
 			bitcoind_client: bitcoind_client,
 			genesis_hash: genesis_block(Network::Testnet).header.block_hash(),
 			default_config: GatewayConfig::default(),
 			secp_ctx,
 			receive_credential_event_gateway: Mutex::new(receive_credential_event_gateway),
+			send_credential_events_gateway: Mutex::new(send_credential_events_gateway),
 			issuance_manager: issuance_manager,
+			redemption_manager: redemption_manager,
 		}
 	}
 
@@ -138,10 +164,16 @@ impl CredentialGateway {
 			for event in credential_queue {
 				match event {
 					ClientEvents::Credential { client_id, event } => {
-						//TODO: check if the event is a credential authentication or service request
-						if let Ok(txid) = self.issuance_manager.register_authentication_request(client_id, event) {
-							println!("[CIVKITD] - CREDENTIAL: txid to verify");
-							proofs_to_verify.push(txid);
+						if event.kind == Kind::CredentialRequest {
+							if let Ok(txid) = self.issuance_manager.register_authentication_request(client_id, event) {
+								println!("[CIVKITD] - CREDENTIAL: txid to verify");
+								proofs_to_verify.push(txid);
+							}
+						} else if event.kind == Kind::CredentialRedemption {
+							// For now validate directly are all information self-contained in redemption manager.
+							self.redemption_manager.validate_service_deliverance(client_id, event);
+						} else {
+							println!("[CIVKITD] - CREDENTIAL: credential event error: unknown kind");
 						}
 					},
 					_ => {},
@@ -153,8 +185,12 @@ impl CredentialGateway {
 				//TODO: send txid query to BitcoindClient
 			}
 
+			let mut authentication_result_queue = Vec::new();
 			for (request_id, validation_result) in validated_requests {
-				self.issuance_manager.validate_authentication_request(request_id, validation_result);
+				//TODO return CredentialAuthenticationResult
+				if let Ok(result) = self.issuance_manager.validate_authentication_request(request_id, validation_result) {
+					authentication_result_queue.push(result);
+				}
 			}
 
 			//TODO: broadcast back events to client gateway
