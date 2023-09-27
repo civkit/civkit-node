@@ -14,7 +14,11 @@ use std::process;
 
 use bitcoin::secp256k1::{PublicKey, SecretKey, Secp256k1, Signature};
 use bitcoin::blockdata::transaction::Transaction;
-use bitcoin::hash_types::Txid;
+use bitcoin::Txid;
+use bitcoin::hashes::{Hash, sha256, HashEngine};
+
+use staking_credentials::common::utils::{Credentials, Proof};
+use staking_credentials::common::msgs::CredentialAuthenticationPayload;
 
 use nostr::{RelayMessage, EventBuilder, Metadata, Keys, ClientMessage, Kind, Filter, SubscriptionId, Timestamp};
 
@@ -200,9 +204,14 @@ fn respond(
         }
 	Some(("sendmarketorder", matches)) => {
 	    let content: Option<&String> = matches.get_one("content");
+
+	    //TODO: add ServiceDeliveranceRequest::new()
+	    //TODO: send kind event 3251
+
 	    if let Ok(kind_32500_event) =
 	        EventBuilder::new_order_note(content.unwrap(), &[]).to_event(client_keys)
 	    {
+
 		let client_message = ClientMessage::new_event(kind_32500_event);
 		let serialized_message = client_message.as_json();
 		tx.unbounded_send(Message::text(serialized_message))
@@ -245,10 +254,22 @@ fn respond(
             return Ok(true);
         }
 	Some(("submitcredentialproof", matches)) => {
-	    let transactionid: Option<&String> = matches.get_one("txid");
-	    let content = String::new();
+	    let txid_parse: Option<&String> = matches.get_one("txid");
+	    let txid_str = txid_parse.unwrap();
+
+	    let bytes = txid_str.as_bytes();
+	    let mut enc = Txid::engine();
+	    enc.input(&bytes);
+	    let txid = Txid::from_engine(enc);
+
+	    let proof = Proof::Txid(txid);
+	    //TODO: get credentials from sample local holder state
+	    let credentials = vec![Credentials([16;32])];
+
+	    let credential_authentication = CredentialAuthenticationPayload::new(proof, credentials);
+
 	    if let Ok(kind_3250_event) =
-		EventBuilder::new_credential_request(content, &[]).to_event(client_keys)
+		EventBuilder::new_credential_request(&*txid_str, &[]).to_event(client_keys)
 	    {
 	        let client_message = ClientMessage::new_event(kind_3250_event);
 		let serialized_message = client_message.as_json();
