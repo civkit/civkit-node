@@ -23,7 +23,7 @@ use nostr::{Event, Kind};
 use staking_credentials::common::msgs::{AssetProofFeatures, CredentialsFeatures};
 use staking_credentials::issuance::issuerstate::IssuerState;
 
-use staking_credentials::common::msgs::ServiceDeliveranceResult;
+use staking_credentials::common::msgs::{CredentialAuthenticationResult, ServiceDeliveranceResult};
 
 use crate::events::ClientEvents;
 use crate::bitcoind_client::BitcoindClient;
@@ -72,11 +72,17 @@ impl IssuanceManager {
 		Ok((request_id, Txid::from_engine(enc)))
 	}
 
-	fn validate_authentication_request(&mut self, request_id: u64, result: bool) -> Result<(), ()> {
+	fn validate_authentication_request(&mut self, request_id: u64, result: bool) -> Result<CredentialAuthenticationResult, ()> {
 		if let Some(request) = self.table_signing_requests.get(&request_id) {
 			//if let Ok(self.issuer_state.authenticate_credentials(request);
+
+			let signatures = vec![];
+
+			let mut credential_authentication_result = CredentialAuthenticationResult::new(signatures);
+
+			return Ok(credential_authentication_result)
 		}
-		Ok(())
+		Err(())
 	}
 }
 
@@ -187,13 +193,18 @@ impl CredentialGateway {
 
 			let mut authentication_result_queue = Vec::new();
 			for (request_id, validation_result) in validated_requests {
-				//TODO return CredentialAuthenticationResult
+				// yield back authentication result to client_id
 				if let Ok(result) = self.issuance_manager.validate_authentication_request(request_id, validation_result) {
 					authentication_result_queue.push(result);
 				}
 			}
 
-			//TODO: broadcast back events to client gateway
+			{
+				for result in authentication_result_queue {
+					let mut send_credential_lock = self.send_credential_events_gateway.lock();
+					//TODO: send back event
+				}
+			}
 		}
 	}
 }
