@@ -13,12 +13,13 @@ use std::io::Write;
 use std::process;
 
 use bitcoin::secp256k1::{PublicKey, SecretKey, Secp256k1, Signature};
+use bitcoin::secp256k1::Message as SecpMessage;
 use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::Txid;
 use bitcoin::hashes::{Hash, sha256, HashEngine};
 
 use staking_credentials::common::utils::{Credentials, Proof};
-use staking_credentials::common::msgs::CredentialAuthenticationPayload;
+use staking_credentials::common::msgs::{CredentialAuthenticationPayload, ServiceDeliveranceRequest};
 
 use nostr::{RelayMessage, EventBuilder, Metadata, Keys, ClientMessage, Kind, Filter, SubscriptionId, Timestamp};
 
@@ -32,6 +33,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message, tungstenite::error::Error};
 
 use std::str::FromStr;
+
+const CLIENT_SECRET_KEY: [u8; 32] = [ 59, 148, 11, 85, 134, 130, 61, 253, 2, 174, 59, 70, 27, 180, 51, 107, 94, 203, 174, 253, 102, 39, 170, 146, 46, 252, 4, 143, 236, 12, 136, 28];
 
 struct CredentialsHolder {
 	state: Vec<([u8; 32], Signature)>,
@@ -205,8 +208,31 @@ fn respond(
 	Some(("sendmarketorder", matches)) => {
 	    let content: Option<&String> = matches.get_one("content");
 
-	    //TODO: add ServiceDeliveranceRequest::new()
-	    //TODO: send kind event 3251
+	    let credentials = vec![];
+	    let signatures = vec![];
+	    let service_id = 0;
+
+	    let secp = Secp256k1::new();
+	    let msg = b"";
+
+	    let hash_msg = sha256::Hash::hash(msg);
+	    let msg = SecpMessage::from_slice(hash_msg.as_ref()).unwrap();
+	    let seckey = SecretKey::from_slice(&CLIENT_SECRET_KEY).unwrap();
+
+	    let commitment_sig = secp.sign_ecdsa(&msg, &seckey);
+
+	    let mut service_deliverance_request = ServiceDeliveranceRequest::new(credentials, signatures, service_id, commitment_sig);
+	    //TODO: serialize service_deliverance_request
+
+	    let empty_content = String::new();
+	    if let Ok(kind_3251_event) =
+		EventBuilder::new_credential_redemption(&empty_content, &[]).to_event(client_keys)
+	    {
+	        let client_message = ClientMessage::new_event(kind_3251_event);
+		let serialized_message = client_message.as_json();
+		tx.unbounded_send(Message::text(serialized_message))
+		    .unwrap();
+	    }
 
 	    if let Ok(kind_32500_event) =
 	        EventBuilder::new_order_note(content.unwrap(), &[]).to_event(client_keys)
