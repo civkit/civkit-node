@@ -84,6 +84,11 @@ impl IssuanceManager {
 		}
 		Err(())
 	}
+	fn get_client_id(&self, request_id: u64) -> u64 {
+		if let Some(client_id) = self.table_signing_requests.get(&request_id) {
+			*client_id
+		} else { 0 }
+	}
 }
 
 struct RedemptionManager { }
@@ -167,6 +172,7 @@ impl CredentialGateway {
 			}
 
 			let mut proofs_to_verify = Vec::new();
+			let mut deliverance_result_queue = Vec::new();
 			for event in credential_queue {
 				match event {
 					ClientEvents::Credential { client_id, event } => {
@@ -177,7 +183,9 @@ impl CredentialGateway {
 							}
 						} else if event.kind == Kind::CredentialRedemption {
 							// For now validate directly are all information self-contained in redemption manager.
-							self.redemption_manager.validate_service_deliverance(client_id, event);
+							if let Ok(result) = self.redemption_manager.validate_service_deliverance(client_id, event) {
+								deliverance_result_queue.push(result);	
+							}
 						} else {
 							println!("[CIVKITD] - CREDENTIAL: credential event error: unknown kind");
 						}
@@ -193,9 +201,9 @@ impl CredentialGateway {
 
 			let mut authentication_result_queue = Vec::new();
 			for (request_id, validation_result) in validated_requests {
-				// yield back authentication result to client_id
 				if let Ok(result) = self.issuance_manager.validate_authentication_request(request_id, validation_result) {
-					authentication_result_queue.push(result);
+					let client_id = self.issuance_manager.get_client_id(request_id);
+					authentication_result_queue.push((client_id, result));
 				}
 			}
 
@@ -203,6 +211,13 @@ impl CredentialGateway {
 				for result in authentication_result_queue {
 					let mut send_credential_lock = self.send_credential_events_gateway.lock();
 					//TODO: send back event
+				}
+			}
+
+			{
+				for result in deliverance_result_queue {
+					let mut send_credential_lock = self.send_credential_events_gateway.lock();
+					//TODO: send bakc event
 				}
 			}
 		}

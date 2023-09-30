@@ -16,6 +16,8 @@ use nostr::{Event, EventId, SubscriptionId};
 
 use tokio::sync::oneshot;
 
+use staking_credentials::common::msgs::{CredentialAuthenticationPayload, CredentialAuthenticationResult, ServiceDeliveranceRequest, ServiceDeliveranceResult};
+
 #[derive(Debug)]
 pub enum ClientEvents {
 	TextNote { event: Event },
