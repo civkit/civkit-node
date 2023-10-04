@@ -20,7 +20,7 @@ use bitcoin::secp256k1;
 
 use nostr::{Event, Kind};
 
-use staking_credentials::common::msgs::{AssetProofFeatures, CredentialsFeatures};
+use staking_credentials::common::msgs::{AssetProofFeatures, CredentialsFeatures, CredentialPolicy, ServicePolicy};
 use staking_credentials::issuance::issuerstate::IssuerState;
 
 use staking_credentials::common::msgs::{CredentialAuthenticationResult, ServiceDeliveranceResult};
@@ -106,6 +106,12 @@ impl RedemptionManager {
 	}
 }
 
+struct Service {
+	pubkey: PublicKey,
+	credential_policy: CredentialPolicy,
+	service_policy: ServicePolicy,
+}
+
 pub struct CredentialGateway {
 	bitcoind_client: BitcoindClient,
 
@@ -120,6 +126,8 @@ pub struct CredentialGateway {
 
 	issuance_manager: IssuanceManager,
 	redemption_manager: RedemptionManager,
+
+	hosted_services: HashMap<u64, Service>,
 }
 
 impl CredentialGateway {
@@ -146,6 +154,8 @@ impl CredentialGateway {
 
 		};
 
+		let hosted_services = HashMap::new();
+
 		CredentialGateway {
 			bitcoind_client: bitcoind_client,
 			genesis_hash: genesis_block(Network::Testnet).header.block_hash(),
@@ -155,6 +165,7 @@ impl CredentialGateway {
 			send_credential_events_gateway: Mutex::new(send_credential_events_gateway),
 			issuance_manager: issuance_manager,
 			redemption_manager: redemption_manager,
+			hosted_services: hosted_services,
 		}
 	}
 
