@@ -22,7 +22,6 @@ use crate::{events, NostrSub, NostrClient};
 use crate::events::{ClientEvents, EventsProvider, ServerCmd};
 use crate::nostr_db::DbRequest;
 use crate::util::{is_ephemeral, is_credential};
-use crate::mainstay::{send_commitment, hash_event};
 
 use staking_credentials::common::msgs::CredentialPolicy;
 
@@ -292,19 +291,7 @@ impl ClientHandler {
 									let relay_message = RelayMessage::new_event(sub_id.clone(), event.clone());
 									let serialized_message = relay_message.as_json();
 									match outgoing_send.send(serialized_message.into_bytes()) {
-										Ok(_) => {
-											let hash = hash_event(&event);
-											let commitment = hash.as_str();
-											let position = self.config.mainstay.position;
-											let token = &self.config.mainstay.token;
-											
-											let result = send_commitment(commitment, position, token, &self.config.mainstay).await;
-
-											match result {
-												Ok(_) => println!("Commitment sent successfully"),
-												Err(err) => println!("Error sending commitment: {}", err),
-											}
-										},
+										Ok(_) => {},
 										Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending subcribed event"); },
 									}
 								}

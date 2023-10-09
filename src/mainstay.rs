@@ -60,7 +60,7 @@ impl Request {
     }
 }
 
-pub async fn send_commitment(commitment: &str, position: u64, token: &str, config: &Mainstay) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn send_commitment(commitment: &str, position: u64, token: &str, config: &Mainstay) -> Result<Request, Box<dyn std::error::Error>> {
     let payload = Payload {
         commitment: commitment.to_string(),
         position: position,
@@ -70,23 +70,5 @@ pub async fn send_commitment(commitment: &str, position: u64, token: &str, confi
     let command = String::from("commitment/send");
     let req = Request::from(Some(&payload), &command, config, None).await?;
 
-    tokio::spawn(async move {
-        match req.send().await {
-            Ok(_) => println!("Request successful"),
-            Err(err) => println!("Error sending request to: {}", err),
-        }
-    });
-
-    Ok(())
-}
-
-pub fn hash_event(event: &Event) -> String {
-	let mut hasher = Sha256::new();
-	let json = serde_json::to_string(event).unwrap();
-  
-	hasher.update(json.as_bytes());
-	let hash = hasher.finalize();
-	let hex_hash = hex::encode(hash.as_slice());
-
-	hex_hash
+    Ok(req)
 }

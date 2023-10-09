@@ -24,6 +24,9 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex as TokioMutex;
 use tokio::time::{sleep, Duration};
 
+use crate::mainstay::{send_commitment};
+use crate::config::Config;
+
 pub struct NoteProcessor {
 	note_counters: Mutex<u64>,
 	current_height: u64,
@@ -32,10 +35,11 @@ pub struct NoteProcessor {
 	send_db_result_handler: TokioMutex<mpsc::UnboundedSender<ClientEvents>>,
 
 	receive_db_requests_manager: TokioMutex<mpsc::UnboundedReceiver<DbRequest>>,
+	config: Config
 }
 
 impl NoteProcessor {
-	pub fn new(receive_db_requests: mpsc::UnboundedReceiver<DbRequest>, receive_db_requests_manager: mpsc::UnboundedReceiver<DbRequest>, send_db_result_handler: mpsc::UnboundedSender<ClientEvents>) -> Self {
+	pub fn new(receive_db_requests: mpsc::UnboundedReceiver<DbRequest>, receive_db_requests_manager: mpsc::UnboundedReceiver<DbRequest>, send_db_result_handler: mpsc::UnboundedSender<ClientEvents>, our_config: Config) -> Self {
 		NoteProcessor {
 			note_counters: Mutex::new(0),
 			current_height: 0,
@@ -44,6 +48,7 @@ impl NoteProcessor {
 			send_db_result_handler: TokioMutex::new(send_db_result_handler),
 
 			receive_db_requests_manager: TokioMutex::new(receive_db_requests_manager),
+			config: our_config
 		}
 	}
 
@@ -131,6 +136,17 @@ impl NoteProcessor {
 			for ev in ok_events {
 				let mut send_db_result_handler_lock = self.send_db_result_handler.lock();
 				let ok_event = ClientEvents::OkEvent { event_id: ev, ret: true, msg: None };
+				let event_id = ev.to_string();
+				let commitment = event_id.as_str();
+				let position = self.config.mainstay.position;
+				let token = &self.config.mainstay.token;
+											
+				let req = send_commitment(commitment, position, token, &self.config.mainstay).await.unwrap();
+
+				match req.send().await {
+					Ok(_) => println!("Commitment sent successfully"),
+					Err(err) => println!("Error sending commitment: {}", err),
+				}
 				send_db_result_handler_lock.await.send(ok_event);
 			}
 		}
