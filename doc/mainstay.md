@@ -89,28 +89,29 @@ impl Request {
 
 ## Commitment construction
 
-The node will construct commitments from specified *events* () in `src/events.rs`. 
+The node will construct commitments from specified *events* () in `src/events.rs`. The `event_id` already hashes the full payload of the event object and can be used for commitment directly. 
 
-The commitment can be simply constructed from the sha256 hash of each event (encoded as a string) similar to:
-
-```
-pub fn make_commitment(data: &String) -> (String) {
-    let mut data_vec = data.as_bytes().iter().cloned().collect::<Vec<u8>>();
-
-    let commitment = sha256d::Hash::hash(&data_vec);
-    return (commitment.to_string());
-}
-```
-
-Will determine which events need to be attested. 
+Initially assume all events are committed. Can add config to set commitment for specific events. 
 
 ## Commitment compression
 
-Initially assume every event will be committed to the mainstay service endpoint. 
+By committing a a *cumulative* hash to the mainstay slot, and saving the cumulative hash alongside the `event_id`, then if individual commitment operations fail, or the mainstay service is temporarily unavailable, the unbroken sequence of events is verifiable as unquine up until the the latest commitment operation. 
 
-It may be more efficient to compress several events into a single commitment and then only commit every `commitment_interval`. 
+In this approach, for each *event* that occurs (in time sequence), the `event_id` is concatenated with the previous cumulative hash and committed to mainstay. 
+
+So, for the first event: `event_id` is used as the commitment and sent to the mainstay commitment endpoint. This is labeled `event_id[0]`. 
+
+For the next event (`event_id[1]`), the commitment hash is computed: `comm_hash[1] = SHA256(event_id[0] || event_id[1])` and committted to the mainstay service API. 
+
+For the next event (`event_id[2]`), the commitment hash is computed: `comm_hash[2] = SHA256(comm_hash[1] || event_id[2])` and committted to the mainstay service API. 
+
+For the next event (`event_id[3]`), the commitment hash is computed: `comm_hash[3] = SHA256(comm_hash[2] || event_id[3])` and committted to the mainstay service API. 
+
+And so on, committing the chain. `comm_hash[n]` does not strictly need to be saved as the chain can be reconstructed directly from the `event_id[n]` saved in the DB. 
 
 ## Proof retreival
+
+TODO
 
 After each commitment, retreive the slot proof from the mainstay server API (call to GET `/commitment/commitment` route with the `commitment` hex string). This will return attestion info (`TxID`) and the slot proof (Merkle proof). 
 
