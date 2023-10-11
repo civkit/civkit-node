@@ -226,7 +226,7 @@ fn respond(
 
 	    let empty_content = String::new();
 	    if let Ok(kind_3251_event) =
-		EventBuilder::new_credential_redemption(&empty_content, &[]).to_event(client_keys)
+		EventBuilder::new_service_deliverance_request(&empty_content, &[]).to_event(client_keys)
 	    {
 	        let client_message = ClientMessage::new_event(kind_3251_event);
 		let serialized_message = client_message.as_json();
@@ -295,7 +295,7 @@ fn respond(
 	    let credential_authentication = CredentialAuthenticationPayload::new(proof, credentials);
 
 	    if let Ok(kind_3250_event) =
-		EventBuilder::new_credential_request(&*txid_str, &[]).to_event(client_keys)
+		EventBuilder::new_credential_authentication_request(&*txid_str, &[]).to_event(client_keys)
 	    {
 	        let client_message = ClientMessage::new_event(kind_3250_event);
 		let serialized_message = client_message.as_json();
