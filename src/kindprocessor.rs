@@ -14,7 +14,7 @@ use nostr::Filter;
 
 use crate::events::ClientEvents;
 use crate::nostr_db::DbRequest;
-use crate::nostr_db::{write_new_subscription_db, write_new_event_db, write_new_client_db, print_events_db, print_clients_db, query_events_db};
+use crate::nostr_db::{write_new_subscription_db, write_new_event_db, write_new_client_db, print_events_db, print_clients_db, query_events_db, get_cumulative_hash_of_last_event};
 
 use std::sync::Mutex;
 
@@ -23,6 +23,7 @@ use crate::util::is_replaceable;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex as TokioMutex;
 use tokio::time::{sleep, Duration};
+use base64::encode;
 
 use crate::mainstay::{send_commitment};
 use crate::config::Config;
@@ -137,11 +138,11 @@ impl NoteProcessor {
 				let mut send_db_result_handler_lock = self.send_db_result_handler.lock();
 				let ok_event = ClientEvents::OkEvent { event_id: ev, ret: true, msg: None };
 				let event_id = ev.to_string();
-				let commitment = event_id.as_str();
+				let commitment = encode(get_cumulative_hash_of_last_event().await.unwrap());
 				let position = self.config.mainstay.position;
 				let token = &self.config.mainstay.token;
 											
-				let req = send_commitment(commitment, position, token, &self.config.mainstay).await.unwrap();
+				let req = send_commitment(commitment.as_str(), position, token, &self.config.mainstay).await.unwrap();
 
 				match req.send().await {
 					Ok(_) => println!("Commitment sent successfully"),

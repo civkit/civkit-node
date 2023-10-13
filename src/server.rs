@@ -17,6 +17,7 @@ use crate::util::init_logger;
 use log;
 use std::fs;
 use crate::servicemanager::ServiceManager;
+use civkit::inclusionproof::InclusionProof;
 use civkit::nostr_db::DbRequest;
 use civkit::config::Config;
 use civkit::clienthandler::ClientHandler;
@@ -381,6 +382,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	// Main handler of services provision.
 	let service_manager = ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, config.clone());
 
+	// We initialize the inclusion proof with txid, commitment and merkle proof as empty strings.
+	let mut inclusion_proof = InclusionProof::new("".to_string(), "".to_string(), "".to_string(), config.clone());
+
 	let addr = format!("[::1]:{}", cli.cli_port).parse()?;
 
 	let service_mngr_svc = Server::builder()
@@ -425,6 +429,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	// TODO: give a channel with ClientHandler
 	tokio::spawn(async move {
 		credential_gateway.run().await;
+	});
+
+	tokio::spawn(async move {
+		inclusion_proof.run().await;
 	});
 
 	// We start the tcp listener for BOLT8 peers.

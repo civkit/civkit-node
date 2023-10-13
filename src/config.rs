@@ -72,7 +72,7 @@ impl Default for Config {
                 level: "info".to_string(),
             },
             mainstay: Mainstay {
-                url: "http://localhost:4000".to_string(),
+                url: "https://mainstay.xyz/api/v1".to_string(),
                 position: 1,
                 token: "14b2b754-5806-4157-883c-732baf88849c".to_string(),
             },

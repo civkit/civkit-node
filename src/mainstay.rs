@@ -1,12 +1,12 @@
 use reqwest;
 use crate::config::Mainstay;
-use nostr::Event;
+use nostr::{Event, EventId};
 use serde_json::json;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use base64::encode;
-use sha2::{Digest, Sha256};
-use hex;
+use bitcoin_hashes::{Hash, sha256};
+use crate::nostr_db::{get_cumulative_hash_of_last_event};
 
 pub struct Request(reqwest::RequestBuilder);
 
@@ -71,4 +71,25 @@ pub async fn send_commitment(commitment: &str, position: u64, token: &str, confi
     let req = Request::from(Some(&payload), &command, config, None).await?;
 
     Ok(req)
+}
+
+pub async fn get_proof(config: &Mainstay) -> Result<Request, Box<dyn std::error::Error>> {
+    let command = format!("commitment/latestproof?position={}", config.position);
+    let req = Request::from(None, &command, config, None).await?;
+
+    Ok(req)
+}
+
+pub async fn calculate_cumulative_hash(eventId: EventId) -> Vec<u8> {
+    let cumulative_hash = get_cumulative_hash_of_last_event().await;
+
+    match cumulative_hash {
+        Some(cumulative_hash) => {
+            let mut concatenated_hash = cumulative_hash;
+            concatenated_hash.extend_from_slice(eventId.as_bytes());
+            let cumulative_hash_bytes = sha256::Hash::hash(&concatenated_hash);
+            cumulative_hash_bytes.to_vec()
+        }
+        None => eventId.as_bytes().to_vec(),
+    }
 }
