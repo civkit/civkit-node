@@ -9,6 +9,7 @@ pub struct Config {
     pub connections: Connections,
     pub civkitd: Civkitd,
     pub logging: Logging,
+    pub mainstay: Mainstay,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
@@ -40,6 +41,13 @@ pub struct Logging {
     pub level: String,
 }
 
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+pub struct Mainstay {
+	pub url: String,
+	pub position: i32,
+	pub token: String,
+}
+
 // default config to fallback
 impl Default for Config {
     fn default() -> Self {
@@ -62,6 +70,11 @@ impl Default for Config {
             },
             logging: Logging {
                 level: "info".to_string(),
+            },
+            mainstay: Mainstay {
+                url: "https://mainstay.xyz/api/v1".to_string(),
+                position: 1,
+                token: "14b2b754-5806-4157-883c-732baf88849c".to_string(),
             },
         }
     }
