@@ -383,7 +383,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let service_manager = ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, config.clone());
 
 	// We initialize the inclusion proof with txid, commitment and merkle proof as empty strings.
-	let mut inclusion_proof = InclusionProof::new("".to_string(), "".to_string(), "".to_string(), config.clone());
+	let mut inclusion_proof = InclusionProof::new("".to_string(), "".to_string(), "".to_string(), Vec::new(), config.clone());
 
 	let addr = format!("[::1]:{}", cli.cli_port).parse()?;
 

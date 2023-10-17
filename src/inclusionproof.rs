@@ -15,20 +15,28 @@ use serde_json::Value;
 
 use crate::mainstay::{get_proof};
 use crate::config::Config;
+use crate::nostr_db::{write_new_inclusion_proof_db};
 
 pub struct InclusionProof {
-    txid: Arc<Mutex<String>>,
-    commitment: Arc<Mutex<String>>,
-    merkle_root: Arc<Mutex<String>>,
-    config: Config,
+    pub txid: Arc<Mutex<String>>,
+    pub commitment: Arc<Mutex<String>>,
+    pub merkle_root: Arc<Mutex<String>>,
+    pub ops: Arc<Mutex<Vec<Ops>>>,
+    pub config: Config,
+}
+
+pub struct Ops {
+    pub append: bool,
+    pub commitment: String,
 }
 
 impl InclusionProof {
-	pub fn new(txid: String, commitment: String, merkle_root: String, our_config: Config) -> Self {
+	pub fn new(txid: String, commitment: String, merkle_root: String, ops: Vec<Ops>, our_config: Config) -> Self {
         InclusionProof {
             txid: Arc::new(Mutex::new(txid)),
             commitment: Arc::new(Mutex::new(commitment)),
             merkle_root: Arc::new(Mutex::new(merkle_root)),
+            ops: Arc::new(Mutex::new(ops)),
             config: our_config,
         }
     }
@@ -45,15 +53,27 @@ impl InclusionProof {
                     let txid = response_json["response"]["txid"].as_str().unwrap();
                     let commitment = response_json["response"]["commitment"].as_str().unwrap();
                     let merkle_root = response_json["response"]["merkle_root"].as_str().unwrap();
-                    
-                    self.txid.lock().unwrap().replace(self.txid.lock().unwrap().as_str(), txid);
-                    self.commitment.lock().unwrap().replace(self.commitment.lock().unwrap().as_str(), commitment);
-                    self.merkle_root.lock().unwrap().replace(self.merkle_root.lock().unwrap().as_str(), merkle_root);
+                    let ops = response_json["response"]["ops"].as_array().unwrap();
+
+                    if (self.txid.lock().unwrap().as_str() != txid) {
+                        *self.txid.lock().unwrap() = txid.to_string();
+                        *self.commitment.lock().unwrap() = commitment.to_string();
+                        *self.merkle_root.lock().unwrap() = merkle_root.to_string();
+
+                        *self.ops.lock().unwrap() = ops.iter()
+                            .map(|value| {
+                                let append = value["append"].as_bool().unwrap();
+                                let commitment = value["commitment"].as_str().unwrap().to_string();
+                                Ops { append, commitment }
+                            })
+                            .collect();
+                        write_new_inclusion_proof_db(self).await;
+                    }
                 },
                 Err(err) => println!("Error in retrieving inclusion proof: {}", err),
             }
             
-			sleep(Duration::from_millis(1000)).await;
+			sleep(Duration::from_millis(60 * 1000)).await;
         }
     }
 }

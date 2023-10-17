@@ -13,9 +13,14 @@ use crate::{NostrSub, NostrPeer, NostrClient};
 
 use crate::mainstay::{calculate_cumulative_hash};
 
+use crate::inclusionproof::{InclusionProof, Ops};
+
 use rusqlite::{Connection, OpenFlags, params};
 
 use std::path::Path;
+use serde_json::json;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 const CIVKITD_DB_FILE: &str = "civkitd.db";
 
@@ -50,6 +55,15 @@ struct DbSub {
 struct DbClient {
 	client_id: i32,
 	data: Option<Vec<u8>>,
+}
+
+#[derive(Debug)]
+struct DbInclusionProof {
+	inclusion_proof_id: u32,
+	txid: Vec<u8>,
+	commitment: Vec<u8>,
+	merkle_root: Vec<u8>,
+	ops: Option<String>,
 }
 
 pub async fn write_new_event_db(event: Event, old_event: Option<Vec<Event>>) -> bool {
@@ -292,3 +306,87 @@ pub async fn log_new_peer_db(peer: NostrPeer) {
 }
 
 //TODO: log function for client
+
+pub async fn write_new_inclusion_proof_db(inclusion_proof: &mut InclusionProof) {
+
+	//TODO: spawn new thread
+	if let Ok(mut conn) = Connection::open_with_flags(
+		Path::new(CIVKITD_DB_FILE),
+		OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE
+	) {
+		println!("[CIVKITD] - NOTE PROCESSING: Opening database for read / write new inclusion proof");
+
+		match conn.execute("CREATE TABLE inclusion_proof (
+			inclusion_proof_id	INTEGER PRIMARY KEY,
+			txid				BLOB,
+			commitment          BLOB,
+			merkle_root         BLOB,
+			ops					BLOB
+		)",
+		()) {
+			Ok(create) => println!("[CIVKITD] - NOTE PROCESSING: {} rows were updated", create),
+			Err(err) => println!("[CIVKITD] - NOTE PROCESSING: table creation failed: {}", err),
+		}
+
+		let inclusion_proof = DbInclusionProof {
+			inclusion_proof_id: 0,
+			txid: inclusion_proof.txid.lock().unwrap().as_bytes().to_vec(),
+			commitment: inclusion_proof.commitment.lock().unwrap().as_bytes().to_vec(),
+			merkle_root: inclusion_proof.merkle_root.lock().unwrap().as_bytes().to_vec(),
+			ops: Some(ops_to_json_string(inclusion_proof.ops.clone())),
+		};
+
+		match conn.execute("INSERT INTO inclusion_proof (txid, commitment, merkle_root, ops) VALUES (?1, ?2, ?3, ?4)",
+			(&inclusion_proof.txid, &inclusion_proof.commitment, &inclusion_proof.merkle_root, &inclusion_proof.ops),
+		) {
+			Ok(update) => println!("[CIVKITD] - NOTE PROCESSING: {} rows were updated", update),
+			Err(err) => println!("[CIVKITD] - NOTE PROCESSING: update insert failed: {}", err),
+		}
+
+		conn.close().ok();
+	} else { println!("Failure to open database"); }
+}
+
+pub async fn print_inclusion_proofs_db() {
+
+	if let Ok(mut conn) = Connection::open_with_flags(
+		Path::new(CIVKITD_DB_FILE),
+		OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE
+	) {
+		println!("[CIVKITD] - NOTE PROCESSING: Opening database for read inclusion proof");
+
+		{
+			let mut stmt = conn.prepare("SELECT inclusion_proof_id, txid, commitment, merkle_root, ops FROM inclusion_proof").unwrap();
+			let inclusion_proof_iter = stmt.query_map([], |row| {
+				Ok(DbInclusionProof {
+					inclusion_proof_id: row.get(0)?,
+					txid: row.get(1)?,
+					commitment: row.get(2)?,
+					merkle_root: row.get(3)?,
+					ops: row.get(4)?,
+				})
+			}).unwrap();
+
+			for inclusion_proof in inclusion_proof_iter {
+				println!("[CIVKITD] - NOTE PROCESSING: Found inclusion proof {:?}", inclusion_proof.unwrap());
+			}
+		}
+
+		conn.close().ok();
+	} else { println!("Failure to open database"); }
+}
+
+pub fn ops_to_json_string(ops: Arc<Mutex<Vec<Ops>>>) -> String {
+    let ops_vec = ops.lock().unwrap();
+    let mut json_array = Vec::new();
+    for op in ops_vec.iter() {
+        let json_object = json!({
+            "append": op.append,
+            "commitment": op.commitment.clone(),
+        });
+        json_array.push(json_object);
+    }
+
+    let json_string = json!(json_array).to_string();
+    return json_string;
+}
