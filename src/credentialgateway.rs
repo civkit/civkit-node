@@ -187,12 +187,12 @@ impl CredentialGateway {
 			for event in credential_queue {
 				match event {
 					ClientEvents::Credential { client_id, event } => {
-						if event.kind == Kind::CredentialRequest {
+						if event.kind == Kind::CredentialAuthenticationRequest {
 							if let Ok(txid) = self.issuance_manager.register_authentication_request(client_id, event) {
 								println!("[CIVKITD] - CREDENTIAL: txid to verify");
 								proofs_to_verify.push(txid);
 							}
-						} else if event.kind == Kind::CredentialRedemption {
+						} else if event.kind == Kind::ServiceDeliveranceRequest {
 							// For now validate directly are all information self-contained in redemption manager.
 							if let Ok(result) = self.redemption_manager.validate_service_deliverance(client_id, event) {
 								deliverance_result_queue.push(result);	
