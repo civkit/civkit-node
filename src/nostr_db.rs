@@ -202,6 +202,29 @@ pub async fn get_cumulative_hash_of_last_event() -> Option<Vec<u8>> {
     None
 }
 
+pub async fn get_hashes_of_all_events() -> Option<Vec<Vec<u8>>> {
+	if let Ok(mut conn) = Connection::open_with_flags(
+			Path::new(CIVKITD_DB_FILE),
+			OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
+		) {
+		let mut stmt = conn
+			.prepare("SELECT sha256 FROM event ORDER BY event_id ASC")
+			.unwrap();
+		let mut hashes = Vec::new();
+		let event_iter = stmt.query_map([], |row| {
+			Ok(row.get(0)?)
+		}).unwrap();
+
+		for event in event_iter {
+			hashes.push(event.unwrap());
+		}
+
+		return Some(hashes);
+	}
+
+	None
+}
+
 pub async fn write_new_client_db(client: NostrClient) {
 
 	//TODO: spawn new thread
