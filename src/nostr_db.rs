@@ -183,11 +183,6 @@ pub fn query_events_db(filter: Filter) -> Result<Vec<Event>, ()> {
 	Err(())
 }
 
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
 pub async fn get_cumulative_hash_of_last_event() -> Option<Vec<u8>> {
     if let Ok(mut conn) = Connection::open_with_flags(
             Path::new(CIVKITD_DB_FILE),
