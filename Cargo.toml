@@ -53,6 +53,8 @@ staking_credentials = { git = "https://github.com/civkit/staking-credentials.git
 reqwest = "0.11.20"
 base64 = "0.21.4"
 jsonrpc = "0.14.0"
+rs_merkle = "1.4.1"
+
 
 [build-dependencies]
 tonic-build = "0.9"
