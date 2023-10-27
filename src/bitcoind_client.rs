@@ -7,11 +7,14 @@
 // You may not use this file except in accordance with one or both of these
 // licenses.
 
+use serde_derive::Deserialize;
+
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
 pub struct BitcoindClient {
-	host: String,
-	port: u16,
-	rpc_user: String,
-	rpc_password: String,
+	pub host: String,
+	pub port: u16,
+	pub rpc_user: String,
+	pub rpc_password: String,
 }
 
 impl BitcoindClient {

@@ -1,6 +1,7 @@
 use std::fs;
 use toml;
 use serde_derive::Deserialize;
+use crate::bitcoind_client::BitcoindClient;
 
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
 pub struct Config {
@@ -10,6 +11,7 @@ pub struct Config {
     pub civkitd: Civkitd,
     pub logging: Logging,
     pub mainstay: Mainstay,
+    pub bitcoind_client: BitcoindClient,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
@@ -46,6 +48,8 @@ pub struct Mainstay {
     pub url: String,
     pub position: u64,
     pub token: String,
+    pub base_pubkey: String,
+    pub chain_code: String,
 }
 
 // default config to fallback
@@ -75,6 +79,14 @@ impl Default for Config {
                 url: "https://mainstay.xyz/api/v1".to_string(),
                 position: 1,
                 token: "14b2b754-5806-4157-883c-732baf88849c".to_string(),
+                base_pubkey: "031dd94c5262454986a2f0a6c557d2cbe41ec5a8131c588b9367c9310125a8a7dc".to_string(),
+                chain_code: "0a090f710e47968aee906804f211cf10cde9a11e14908ca0f78cc55dd190ceaa".to_string(),
+            },
+            bitcoind_client: BitcoindClient {
+                host: "http://127.0.0.1".to_string(),
+                port: 18444,
+                rpc_user: "polaruser".to_string(),
+                rpc_password: "polarpass".to_string(),
             },
         }
     }

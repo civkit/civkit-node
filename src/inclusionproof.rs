@@ -16,6 +16,7 @@ use serde_json::Value;
 use crate::mainstay::{get_proof};
 use crate::config::Config;
 use crate::nostr_db::{write_new_inclusion_proof_db};
+use crate::verifycommitment::{verify_merkle_root_inclusion};
 
 pub struct InclusionProof {
     pub txid: Arc<Mutex<String>>,
@@ -68,6 +69,8 @@ impl InclusionProof {
                             })
                             .collect();
                         write_new_inclusion_proof_db(self).await;
+                        let txid = "f466d3a48ced21340f0b9b2ea57eef70ec1f7b57622ab26d2fb6c7583a7edf85";
+                        verify_merkle_root_inclusion(txid.to_string(), self);
                     }
                 },
                 Err(err) => println!("Error in retrieving inclusion proof: {}", err),
