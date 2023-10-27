@@ -16,6 +16,7 @@ use serde_json::Value;
 use crate::mainstay::{get_proof};
 use crate::config::Config;
 use crate::nostr_db::{write_new_inclusion_proof_db};
+use crate::verifycommitment::{verify_merkle_root_inclusion};
 
 pub struct InclusionProof {
     pub txid: Arc<Mutex<String>>,

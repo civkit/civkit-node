@@ -12,6 +12,7 @@
 mod servicemanager;
 mod config;
 mod util;
+mod bitcoind_client;
 
 use crate::util::init_logger;
 use log;
