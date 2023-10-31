@@ -289,6 +289,7 @@ fn respond(
 	    let txid = Txid::from_engine(enc);
 
 	    let proof = Proof::Txid(txid);
+
 	    //TODO: get credentials from sample local holder state
 	    let credentials = vec![Credentials([16;32])];
 

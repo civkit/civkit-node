@@ -7,6 +7,32 @@
 // You may not use this file except in accordance with one or both of these
 // licenses.
 
+use crate::config::Config;
+
+pub struct BitcoindHandler {
+
+	bitcoind_client: BitcoindClient,
+
+	config: Config,
+}
+
+impl BitcoindHandler {
+	pub fn new(config: Config) -> BitcoindHandler {
+
+		let bitcoind_client = BitcoindClient {
+			host: "".to_string(),
+			port: 0,
+			rpc_user: "".to_string(),
+			rpc_password: "".to_string(),
+		};
+
+		BitcoindHandler {
+			bitcoind_client,
+			config,
+		}
+	}
+}
+
 pub struct BitcoindClient {
 	host: String,
 	port: u16,
