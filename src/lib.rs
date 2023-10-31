@@ -107,3 +107,6 @@ pub mod clienthandler;
 pub mod config;
 pub mod util;
 pub mod bitcoind_client;
+pub mod mainstay;
+pub mod inclusionproof;
+pub mod verifycommitment;
