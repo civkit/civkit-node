@@ -21,7 +21,7 @@ use bitcoin::hashes::{Hash, sha256, HashEngine};
 use staking_credentials::common::utils::{Credentials, Proof};
 use staking_credentials::common::msgs::{CredentialAuthenticationPayload, ServiceDeliveranceRequest};
 
-use nostr::{RelayMessage, EventBuilder, Metadata, Keys, ClientMessage, Kind, Filter, SubscriptionId, Timestamp};
+use nostr::{RelayMessage, EventBuilder, Metadata, Keys, ClientMessage, Kind, Filter, SubscriptionId, Timestamp, Tag};
 
 use url::Url;
 
@@ -298,6 +298,23 @@ fn respond(
 		EventBuilder::new_credential_authentication_request(&*txid_str, &[]).to_event(client_keys)
 	    {
 	        let client_message = ClientMessage::new_event(kind_3250_event);
+		let serialized_message = client_message.as_json();
+		tx.unbounded_send(Message::text(serialized_message))
+		    .unwrap();
+	    }
+	}
+	Some(("verifyattestationproof", matches)) => {
+            let attestation_proof: Option<&String> = matches.get_one("attestation_proof");
+	    let attestation_proof_str = attestation_proof.unwrap();
+
+	    let tags = &[
+		Tag::Attestation(attestation_proof_str.as_bytes().to_vec()),
+	    ];
+
+	    if let Ok(kind_4250_event) =
+		EventBuilder::new_text_note("", tags).to_event(client_keys)
+	    {
+		let client_message = ClientMessage::new_event(kind_4250_event);
 		let serialized_message = client_message.as_json();
 		tx.unbounded_send(Message::text(serialized_message))
 		    .unwrap();
