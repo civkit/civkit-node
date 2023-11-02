@@ -10,6 +10,7 @@ use tokio::sync::mpsc;
 use std::io::Write; 
 use std::fs;
 
+use nostr::TagKind;
 
 pub fn get_default_data_dir() -> PathBuf {
     let home_dir = dirs::home_dir().expect("Home directory not found");
@@ -76,8 +77,10 @@ pub fn is_replaceable(ev: &Event) -> bool {
 
 // Function to assert if an event is a credential msg
 pub fn is_credential(ev: &Event) -> bool {
-	if 3250 <= ev.kind.as_u32() && ev.kind.as_u32() < 3252 {
-		return true;
+	for tag in &ev.tags {
+		if tag.kind() == TagKind::Credential {
+			return true;
+		}
 	}
 	return false;
 }

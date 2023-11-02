@@ -289,15 +289,21 @@ fn respond(
 	    let txid = Txid::from_engine(enc);
 
 	    let proof = Proof::Txid(txid);
+
 	    //TODO: get credentials from sample local holder state
 	    let credentials = vec![Credentials([16;32])];
 
 	    let credential_authentication = CredentialAuthenticationPayload::new(proof, credentials);
 
-	    if let Ok(kind_3250_event) =
-		EventBuilder::new_credential_authentication_request(&*txid_str, &[]).to_event(client_keys)
+	    //TODO: credential_authentication.serialize()
+	    let tags = &[
+		Tag::Credential(vec![]),
+	    ];
+
+	    if let Ok(credential_carrier) =
+		EventBuilder::new_text_note("", tags).to_event(client_keys)
 	    {
-	        let client_message = ClientMessage::new_event(kind_3250_event);
+	        let client_message = ClientMessage::new_event(credential_carrier);
 		let serialized_message = client_message.as_json();
 		tx.unbounded_send(Message::text(serialized_message))
 		    .unwrap();

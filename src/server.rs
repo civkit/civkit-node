@@ -26,6 +26,7 @@ use civkit::credentialgateway::CredentialGateway;
 use civkit::kindprocessor::NoteProcessor;
 use civkit::nodesigner::NodeSigner;
 use civkit::peerhandler::{NoiseGateway, PeerInfo};
+use civkit::bitcoind_client::BitcoindHandler;
 use civkit::NostrClient;
 
 use civkit::oniongateway::OnionBox;
@@ -378,6 +379,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	// Main handler of Nostr connections.
 	// TODO: add receive_credential_events_handler
 	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests, handler_receive_db_result, send_credential_events_handler, config.clone());
+
+	let bitcoind_handler = BitcoindHandler::new(config.clone());
 
 	// Main handler of services provision.
 	let service_manager = ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, config.clone());
