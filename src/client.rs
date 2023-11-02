@@ -9,7 +9,7 @@
 
 use adminctrl::admin_ctrl_client::AdminCtrlClient;
 //TODO: simplify by using prefix
-use adminctrl::{PingRequest, PongRequest, ShutdownRequest, ShutdownReply, SendNote, ReceivedNote, ListClientRequest, ListSubscriptionRequest, PeerConnectionRequest, DisconnectClientRequest, SendNotice, SendOffer, SendInvoice, ListDbEventsRequest, ListDbClientsRequest, ListDbClientsReply};
+use adminctrl::{PingRequest, PongRequest, ShutdownRequest, ShutdownReply, SendNote, ReceivedNote, ListClientRequest, ListSubscriptionRequest, PeerConnectionRequest, DisconnectClientRequest, SendNotice, SendOffer, SendInvoice, ListDbEventsRequest, ListDbClientsRequest, ListDbClientsReply, CheckTxidInclusionRequest};
 
 use std::env;
 use std::process;
@@ -77,7 +77,11 @@ enum Command {
 	/// List DB entries
 	ListDbEvents,
 	/// List DB clients entries
-	ListDbClients
+	ListDbClients,
+	/// Check txid inclusion
+	CheckTxidInclusion {
+		txid: Vec<u8>,
+	}
 }
 
 #[tokio::main]
@@ -201,6 +205,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 			let request = tonic::Request::new(ListDbClientsRequest {});
 
 			let _response = client.list_db_clients(request).await?;
+		}
+		Command::CheckTxidInclusion { txid } => {
+			let request = tonic::Request::new(CheckTxidInclusionRequest {
+				txid: txid.to_vec(),
+			});
+
+			let _response = client.check_txid_inclusion(request).await?;
 		}
 	}
 	Ok(())

@@ -258,6 +258,17 @@ impl AdminCtrl for ServiceManager {
 
 		Ok(Response::new(adminctrl::ListDbClientsReply {}))
 	}
+
+	async fn check_txid_inclusion(&self, request: Request<adminctrl::CheckTxidInclusionRequest>) -> Result<Response<adminctrl::CheckTxidInclusionReply>, Status> {
+
+		println!("[CIVKITD] - CONTROL: check txid inclusion !");
+
+		{
+			//TODO
+		}
+
+		Ok(Response::new(adminctrl::CheckTxidInclusionReply {}))
+	}
 }
 
 struct DummyManager {}
@@ -437,6 +448,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	tokio::spawn(async move {
 		inclusion_proof.run().await;
 	});
+
+
 
 	// We start the tcp listener for BOLT8 peers.
 	tokio::spawn(async move {
