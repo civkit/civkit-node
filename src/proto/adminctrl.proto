@@ -20,6 +20,7 @@ service AdminCtrl {
 	rpc PublishInvoice (SendInvoice) returns (ReceivedInvoice);
 	rpc ListDbEvents (ListDbEventsRequest) returns (ListDbEventsReply);
 	rpc ListDbClients (ListDbClientsRequest) returns (ListDbClientsReply);
+	rpc CheckTxidInclusion (CheckTxidInclusionRequest) returns (CheckTxidInclusionReply);
 }
 
 message PingRequest {
@@ -126,4 +127,11 @@ message ListDbClientsRequest {
 }
 
 message ListDbClientsReply {
+}
+
+message CheckTxidInclusionRequest {
+	bytes txid = 1;
+}
+
+message CheckTxidInclusionReply {
 }
