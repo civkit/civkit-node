@@ -26,7 +26,7 @@ use civkit::credentialgateway::CredentialGateway;
 use civkit::kindprocessor::NoteProcessor;
 use civkit::nodesigner::NodeSigner;
 use civkit::peerhandler::{NoiseGateway, PeerInfo};
-use civkit::bitcoind_client::BitcoindHandler;
+use civkit::bitcoind_client::{BitcoindHandler, BitcoindRequest};
 use civkit::NostrClient;
 
 use civkit::oniongateway::OnionBox;
@@ -264,7 +264,8 @@ impl AdminCtrl for ServiceManager {
 		println!("[CIVKITD] - CONTROL: check txid inclusion !");
 
 		{
-			//TODO
+			let mut send_bitcoind_request_lock = self.send_bitcoind_request.lock().unwrap();
+			send_bitcoind_request_lock.send(BitcoindRequest::CheckRpcCall);
 		}
 
 		Ok(Response::new(adminctrl::CheckTxidInclusionReply {}))
@@ -369,6 +370,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 	let (send_credential_events_gateway, receive_credential_event_handler) = mpsc::unbounded_channel::<ClientEvents>();
 
+	let (manager_send_bitcoind_request, receive_bitcoind_request) = mpsc::unbounded_channel::<(BitcoindRequest)>();
+
 	// The onion message handler...quite empty for now.
 	let onion_box = OnionBox::new();
 
@@ -391,10 +394,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	// TODO: add receive_credential_events_handler
 	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests, handler_receive_db_result, send_credential_events_handler, config.clone());
 
-	let bitcoind_handler = BitcoindHandler::new(config.clone());
+	let bitcoind_handler = BitcoindHandler::new(config.clone(), receive_bitcoind_request);
 
 	// Main handler of services provision.
-	let service_manager = ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, config.clone());
+	let service_manager = ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, manager_send_bitcoind_request, config.clone());
 
 	// We initialize the inclusion proof with txid, commitment and merkle proof as empty strings.
 	let mut inclusion_proof = InclusionProof::new("".to_string(), "".to_string(), "".to_string(), Vec::new(), config.clone());
