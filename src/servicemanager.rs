@@ -24,6 +24,7 @@ use civkit::credentialgateway::CredentialGateway;
 use civkit::events::ClientEvents;
 use civkit::nodesigner::NodeSigner;
 use civkit::peerhandler::PeerInfo;
+use civkit::bitcoind_client::BitcoindRequest;
 use civkit::config::Config;
 
 // use lock from futures::lock
@@ -46,6 +47,8 @@ pub struct ServiceManager
 
 	pub send_db_request: Mutex<mpsc::UnboundedSender<DbRequest>>,
 
+	pub send_bitcoind_request: Mutex<mpsc::UnboundedSender<BitcoindRequest>>,
+
 	our_service_pubkey: PublicKey,
 	config: Config,
 	secp_ctx: Secp256k1<secp256k1::All>,
@@ -53,7 +56,7 @@ pub struct ServiceManager
 
 impl ServiceManager
 {
-	pub fn new(node_signer: Arc<NodeSigner>, anchor_manager: Arc<AnchorManager>, board_events_send: mpsc::UnboundedSender<ClientEvents>, board_peers_send: mpsc::UnboundedSender<PeerInfo>, send_db_request: mpsc::UnboundedSender<DbRequest>, our_config: Config) -> Self {
+	pub fn new(node_signer: Arc<NodeSigner>, anchor_manager: Arc<AnchorManager>, board_events_send: mpsc::UnboundedSender<ClientEvents>, board_peers_send: mpsc::UnboundedSender<PeerInfo>, send_db_request: mpsc::UnboundedSender<DbRequest>, send_bitcoind_request: mpsc::UnboundedSender<BitcoindRequest>, our_config: Config) -> Self {
 		let secp_ctx = Secp256k1::new();
 		let pubkey = PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[42;32]).unwrap());
 		ServiceManager {
@@ -63,6 +66,7 @@ impl ServiceManager
 			service_events_send: Mutex::new(board_events_send),
 			service_peers_send: Mutex::new(board_peers_send),
 			send_db_request: Mutex::new(send_db_request),
+			send_bitcoind_request: Mutex::new(send_bitcoind_request),
 			our_service_pubkey: pubkey,
 			config: our_config,
 			secp_ctx,

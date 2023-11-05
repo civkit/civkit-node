@@ -9,7 +9,17 @@
 
 use crate::config::Config;
 
+use tokio::sync::mpsc;
+use tokio::sync::Mutex as TokioMutex;
+
+#[derive(Debug)]
+pub enum BitcoindRequest {
+	CheckRpcCall,
+}
+
 pub struct BitcoindHandler {
+
+	receive_bitcoind_request: TokioMutex<mpsc::UnboundedReceiver<BitcoindRequest>>,
 
 	bitcoind_client: BitcoindClient,
 
@@ -17,7 +27,7 @@ pub struct BitcoindHandler {
 }
 
 impl BitcoindHandler {
-	pub fn new(config: Config) -> BitcoindHandler {
+	pub fn new(config: Config, receive_bitcoind_requests: mpsc::UnboundedReceiver<BitcoindRequest>) -> BitcoindHandler {
 
 		let bitcoind_client = BitcoindClient {
 			host: "".to_string(),
@@ -27,6 +37,7 @@ impl BitcoindHandler {
 		};
 
 		BitcoindHandler {
+			receive_bitcoind_request: TokioMutex::new(receive_bitcoind_requests),
 			bitcoind_client,
 			config,
 		}
