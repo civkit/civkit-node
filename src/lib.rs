@@ -95,6 +95,8 @@ impl NostrClient {
 	}
 }
 
+pub extern crate jsonrpc;
+
 pub mod events;
 pub mod nostr_db;
 pub mod anchormanager;
@@ -110,3 +112,4 @@ pub mod bitcoind_client;
 pub mod mainstay;
 pub mod inclusionproof;
 pub mod verifycommitment;
+pub mod rpcclient;
