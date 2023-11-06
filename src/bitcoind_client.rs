@@ -22,13 +22,13 @@ pub enum BitcoindRequest {
 
 pub struct BitcoindClient {
 	host: String,
-	port: u16,
+	port: String,
 	rpc_user: String,
 	rpc_password: String,
 }
 
 impl BitcoindClient {
-	pub fn new(host: String, port: u16, rpc_user: String, rpc_password: String) -> Self {
+	pub fn new(host: String, port: String, rpc_user: String, rpc_password: String) -> Self {
 		BitcoindClient {
 			host: host,
 			port: port,
@@ -63,13 +63,17 @@ impl BitcoindHandler {
 	pub fn new(config: Config, receive_bitcoind_requests: mpsc::UnboundedReceiver<BitcoindRequest>) -> BitcoindHandler {
 
 		let bitcoind_client = BitcoindClient {
-			host: "".to_string(),
-			port: 0,
-			rpc_user: "".to_string(),
-			rpc_password: "".to_string(),
+			host: config.bitcoind_params.host.clone(),
+			port: config.bitcoind_params.port.clone(),
+			rpc_user: config.bitcoind_params.rpc_user.clone(),
+			rpc_password: config.bitcoind_params.rpc_password.clone(),
 		};
 
-		let rpc_client = Client::new(&bitcoind_client.host, Auth::None).unwrap();
+		let separator = ":";
+		let url = bitcoind_client.host.clone() + &separator + &bitcoind_client.port.clone();
+		println!("Client url {}", url);
+
+		let rpc_client = Client::new(&url, Auth::None).unwrap();
 
 		BitcoindHandler {
 			receive_bitcoind_request: TokioMutex::new(receive_bitcoind_requests),
@@ -89,8 +93,7 @@ impl BitcoindHandler {
 					BitcoindRequest::CheckRpcCall => {
 						println!("[CIVKITD] - BITCOIND CLIENT: Received rpc call");
  
-						//TODO: pass real arguments
-						self.rpc_client.call("test", &vec![]);
+						self.rpc_client.call("getblockchaininfo", &vec![]);
 					}
 					_ => {},
 				}

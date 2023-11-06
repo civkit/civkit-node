@@ -10,6 +10,7 @@ pub struct Config {
     pub civkitd: Civkitd,
     pub logging: Logging,
     pub mainstay: Mainstay,
+    pub bitcoind_params: BitcoindParams,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
@@ -48,6 +49,14 @@ pub struct Mainstay {
 	pub token: String,
 }
 
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+pub struct BitcoindParams {
+	pub host: String,
+	pub port: String,
+	pub rpc_user: String,
+	pub rpc_password: String,
+}
+
 // default config to fallback
 impl Default for Config {
     fn default() -> Self {
@@ -76,6 +85,12 @@ impl Default for Config {
                 position: 1,
                 token: "14b2b754-5806-4157-883c-732baf88849c".to_string(),
             },
+	    bitcoind_params: BitcoindParams {
+		host: "http://127.0.0.1".to_string(),
+		port: "18443".to_string(), // regtest
+		rpc_user: "civkitd_client".to_string(),
+		rpc_password: "hello_world".to_string(),
+	    }
         }
     }
 }

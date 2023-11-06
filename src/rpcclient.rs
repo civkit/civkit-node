@@ -59,6 +59,8 @@ impl Client {
 			let req = self.client.build_request(&cmd, &raw_args);
 		
 			let resp = self.client.send_request(req);
+
+			println!("resp {:?}", resp.unwrap());
 		}
 
 		Ok(())
