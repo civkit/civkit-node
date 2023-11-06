@@ -394,7 +394,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	// TODO: add receive_credential_events_handler
 	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests, handler_receive_db_result, send_credential_events_handler, config.clone());
 
-	let bitcoind_handler = BitcoindHandler::new(config.clone(), receive_bitcoind_request);
+	let mut bitcoind_handler = BitcoindHandler::new(config.clone(), receive_bitcoind_request);
 
 	// Main handler of services provision.
 	let service_manager = ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, manager_send_bitcoind_request, config.clone());
@@ -452,7 +452,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 		inclusion_proof.run().await;
 	});
 
-
+	tokio::spawn(async move {
+		bitcoind_handler.run().await;
+	});
 
 	// We start the tcp listener for BOLT8 peers.
 	tokio::spawn(async move {
