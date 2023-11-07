@@ -132,7 +132,7 @@ pub struct CredentialGateway {
 
 impl CredentialGateway {
 	pub fn new(receive_credential_event_gateway: mpsc::UnboundedReceiver<ClientEvents>, send_credential_events_gateway: mpsc::UnboundedSender<ClientEvents>) -> Self {
-		let bitcoind_client = BitcoindClient::new(String::new(), 0, String::new(), String::new());
+		let bitcoind_client = BitcoindClient::new(String::new(), "0".to_string(), String::new(), String::new());
 		let secp_ctx = Secp256k1::new();
 		//TODO: should be given a path to bitcoind to use the wallet
 
