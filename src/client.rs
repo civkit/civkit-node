@@ -9,7 +9,7 @@
 
 use adminctrl::admin_ctrl_client::AdminCtrlClient;
 //TODO: simplify by using prefix
-use adminctrl::{PingRequest, PongRequest, ShutdownRequest, ShutdownReply, SendNote, ReceivedNote, ListClientRequest, ListSubscriptionRequest, PeerConnectionRequest, DisconnectClientRequest, SendNotice, SendOffer, SendInvoice, ListDbEventsRequest, ListDbClientsRequest, ListDbClientsReply, CheckTxidInclusionRequest};
+use adminctrl::{PingRequest, PongRequest, ShutdownRequest, ShutdownReply, SendNote, ReceivedNote, ListClientRequest, ListSubscriptionRequest, PeerConnectionRequest, DisconnectClientRequest, SendNotice, SendOffer, SendInvoice, ListDbEventsRequest, ListDbClientsRequest, ListDbClientsReply, CheckChainStateRequest, CheckChainStateReply, GenerateTxInclusionProofRequest, GenerateTxInclusionProofReply};
 
 use std::env;
 use std::process;
@@ -78,8 +78,10 @@ enum Command {
 	ListDbEvents,
 	/// List DB clients entries
 	ListDbClients,
-	/// Check txid inclusion
-	CheckTxidInclusion {
+	/// Check chain state is available
+	CheckChainState,
+	/// Generate a merkle block (header + merkle branch) for the target txid
+	GenerateTxInclusionProof {
 		txid: Vec<u8>,
 	}
 }
@@ -206,12 +208,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 			let _response = client.list_db_clients(request).await?;
 		}
-		Command::CheckTxidInclusion { txid } => {
-			let request = tonic::Request::new(CheckTxidInclusionRequest {
+		Command::CheckChainState => {
+			let request = tonic::Request::new(CheckChainStateRequest {});
+
+			let _response = client.check_chain_state(request).await?;
+		}
+		Command::GenerateTxInclusionProof { txid } => {
+			let request = tonic::Request::new(GenerateTxInclusionProofRequest {
 				txid: txid.to_vec(),
 			});
 
-			let _response = client.check_txid_inclusion(request).await?;
+			let _response = client.generate_tx_inclusion_proof(request).await?;
 		}
 	}
 	Ok(())
