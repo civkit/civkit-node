@@ -1,7 +1,6 @@
 use std::fs;
 use toml;
 use serde_derive::Deserialize;
-use crate::bitcoind_client::BitcoindClient;
 
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
 pub struct Config {
