@@ -137,8 +137,9 @@ message CheckChainStateReply {
 }
 
 message GenerateTxInclusionProofRequest {
-	bytes txid = 1;
+	string txid = 1;
 }
 
 message GenerateTxInclusionProofReply {
+	string merkle_block = 1;
 }

@@ -82,7 +82,7 @@ enum Command {
 	CheckChainState,
 	/// Generate a merkle block (header + merkle branch) for the target txid
 	GenerateTxInclusionProof {
-		txid: Vec<u8>,
+		txid: String,
 	}
 }
 
@@ -215,10 +215,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		}
 		Command::GenerateTxInclusionProof { txid } => {
 			let request = tonic::Request::new(GenerateTxInclusionProofRequest {
-				txid: txid.to_vec(),
+				txid: txid
 			});
 
-			let _response = client.generate_tx_inclusion_proof(request).await?;
+			if let Ok(response) = client.generate_tx_inclusion_proof(request).await {
+				println!("tx inclusion proof: {}", response.into_inner().merkle_block);
+			}
 		}
 	}
 	Ok(())

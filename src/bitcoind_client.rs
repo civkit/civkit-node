@@ -10,7 +10,12 @@
 use crate::config::Config;
 use crate::rpcclient::{Client, Auth};
 
-use tokio::sync::mpsc;
+use jsonrpc::Response;
+
+use bitcoin::{MerkleBlock, Txid};
+use bitcoin_hashes::hex::FromHex;
+
+use tokio::sync::{mpsc, oneshot};
 use tokio::sync::Mutex as TokioMutex;
 
 use tokio::time::{sleep, Duration};
@@ -18,6 +23,7 @@ use tokio::time::{sleep, Duration};
 #[derive(Debug)]
 pub enum BitcoindRequest {
 	CheckRpcCall,
+	GenerateTxInclusionProof { txid: String, respond_to: oneshot::Sender<Option<String>> },
 }
 
 pub struct BitcoindClient {
@@ -95,7 +101,26 @@ impl BitcoindHandler {
 						println!("[CIVKITD] - BITCOIND CLIENT: Received rpc call - Test bitcoind");
  
 						self.rpc_client.call("getblockchaininfo", &vec![]);
-					}
+					},
+					BitcoindRequest::GenerateTxInclusionProof { txid, respond_to } => {
+						println!("[CIVKITD] - BITCOIND CLIENT: Received rpc call - Generate merkle block");
+
+						let txid_json_value = serde_json::to_value(txid).unwrap();
+						let txid_json = serde_json::Value::Array(vec![txid_json_value]);
+
+						if let Ok(response) = self.rpc_client.call("gettxoutproof", &[txid_json]) {
+							if let Some(raw_value) = response.result {
+								let mut mb_string = raw_value.get().to_string();
+								let index = mb_string.find('\"').unwrap();
+								mb_string.remove(index);
+								let index = mb_string.find('\"').unwrap();
+								mb_string.remove(index);
+								//let mb_bytes = Vec::from_hex(&mb_string).unwrap();
+								//let mb: MerkleBlock = bitcoin::consensus::deserialize(&mb_bytes).unwrap();
+								respond_to.send(Some(mb_string));
+							}
+						} else { respond_to.send(None); }
+					},
 					_ => {},
 				}
 			}
