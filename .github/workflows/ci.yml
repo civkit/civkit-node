@@ -55,7 +55,12 @@ jobs:
     - name: Install dependencies
       run: |
           apt-get update
-          apt-get install -y curl gcc protobuf-compiler libsqlite3-dev
+          apt-get install -y curl gcc protobuf-compiler libsqlite3-dev pkg-config libssl-dev
+    - name: Set environment variables for pkg-config and OpenSSL
+    
+      run: |
+          echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
+          echo "OPENSSL_DIR=/usr/include/openssl" >> $GITHUB_ENV
 
     - name: Install Rust Toolchain (stable)
       shell: bash
