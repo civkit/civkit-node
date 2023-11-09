@@ -86,7 +86,7 @@ impl Default for Config {
                 token: "14b2b754-5806-4157-883c-732baf88849c".to_string(),
             },
 	    bitcoind_params: BitcoindParams {
-		host: "http://127.0.0.1".to_string(),
+		host: "https://127.0.0.1".to_string(),
 		port: "18443".to_string(), // regtest
 		rpc_user: "civkitd_client".to_string(),
 		rpc_password: "hello_world".to_string(),

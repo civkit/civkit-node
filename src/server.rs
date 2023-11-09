@@ -259,16 +259,28 @@ impl AdminCtrl for ServiceManager {
 		Ok(Response::new(adminctrl::ListDbClientsReply {}))
 	}
 
-	async fn check_txid_inclusion(&self, request: Request<adminctrl::CheckTxidInclusionRequest>) -> Result<Response<adminctrl::CheckTxidInclusionReply>, Status> {
+	async fn check_chain_state(&self, request: Request<adminctrl::CheckChainStateRequest>) -> Result<Response<adminctrl::CheckChainStateReply>, Status> {
 
-		println!("[CIVKITD] - CONTROL: check txid inclusion !");
+		println!("[CIVKITD] - CONTROL: check chain state !");
 
 		{
 			let mut send_bitcoind_request_lock = self.send_bitcoind_request.lock().unwrap();
 			send_bitcoind_request_lock.send(BitcoindRequest::CheckRpcCall);
 		}
 
-		Ok(Response::new(adminctrl::CheckTxidInclusionReply {}))
+		Ok(Response::new(adminctrl::CheckChainStateReply {}))
+	}
+
+	async fn generate_tx_inclusion_proof(&self, request: Request<adminctrl::GenerateTxInclusionProofRequest>) -> Result<Response<adminctrl::GenerateTxInclusionProofReply>, Status> {
+
+		println!("[CIVKITD] - CONTROL: generate tx inclusion proof!");
+
+		{
+			let mut send_bitcoind_request_lock = self.send_bitcoind_request.lock().unwrap();
+			send_bitcoind_request_lock.send(BitcoindRequest::CheckRpcCall);
+		}
+
+		Ok(Response::new(adminctrl::GenerateTxInclusionProofReply {}))
 	}
 }
 

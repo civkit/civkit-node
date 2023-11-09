@@ -57,10 +57,12 @@ impl Client {
 		}).map(|a| a.map_err(|e| Error::Json(e))).collect::<Result<Vec<_>, Error>>() {
 	
 			let req = self.client.build_request(&cmd, &raw_args);
+
+			println!("req {:?}", req);
 		
 			let resp = self.client.send_request(req);
 
-			println!("resp {:?}", resp.unwrap());
+			println!("resp {:?}", resp);
 		}
 
 		Ok(())

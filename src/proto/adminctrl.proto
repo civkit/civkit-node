@@ -20,7 +20,8 @@ service AdminCtrl {
 	rpc PublishInvoice (SendInvoice) returns (ReceivedInvoice);
 	rpc ListDbEvents (ListDbEventsRequest) returns (ListDbEventsReply);
 	rpc ListDbClients (ListDbClientsRequest) returns (ListDbClientsReply);
-	rpc CheckTxidInclusion (CheckTxidInclusionRequest) returns (CheckTxidInclusionReply);
+	rpc CheckChainState (CheckChainStateRequest) returns (CheckChainStateReply);
+	rpc GenerateTxInclusionProof (GenerateTxInclusionProofRequest) returns (GenerateTxInclusionProofReply);
 }
 
 message PingRequest {
@@ -129,9 +130,15 @@ message ListDbClientsRequest {
 message ListDbClientsReply {
 }
 
-message CheckTxidInclusionRequest {
+message CheckChainStateRequest {
+}
+
+message CheckChainStateReply {
+}
+
+message GenerateTxInclusionProofRequest {
 	bytes txid = 1;
 }
 
-message CheckTxidInclusionReply {
+message GenerateTxInclusionProofReply {
 }

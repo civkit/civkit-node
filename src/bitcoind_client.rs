@@ -71,9 +71,10 @@ impl BitcoindHandler {
 
 		let separator = ":";
 		let url = bitcoind_client.host.clone() + &separator + &bitcoind_client.port.clone();
-		println!("Client url {}", url);
 
-		let rpc_client = Client::new(&url, Auth::None).unwrap();
+		let user_pass = Auth::UserPass(bitcoind_client.rpc_user.clone(), bitcoind_client.rpc_password.clone());
+
+		let rpc_client = Client::new(&url, user_pass).unwrap();
 
 		BitcoindHandler {
 			receive_bitcoind_request: TokioMutex::new(receive_bitcoind_requests),
@@ -91,7 +92,7 @@ impl BitcoindHandler {
 			if let Ok(bitcoind_request) = receive_bitcoind_request_lock.await.try_recv() {
 				match bitcoind_request {
 					BitcoindRequest::CheckRpcCall => {
-						println!("[CIVKITD] - BITCOIND CLIENT: Received rpc call");
+						println!("[CIVKITD] - BITCOIND CLIENT: Received rpc call - Test bitcoind");
  
 						self.rpc_client.call("getblockchaininfo", &vec![]);
 					}
