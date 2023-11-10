@@ -13,6 +13,8 @@ mod servicemanager;
 mod config;
 mod util;
 
+use bitcoin::MerkleBlock;
+
 use crate::util::init_logger;
 use log;
 use std::fs;
@@ -273,14 +275,18 @@ impl AdminCtrl for ServiceManager {
 
 	async fn generate_tx_inclusion_proof(&self, request: Request<adminctrl::GenerateTxInclusionProofRequest>) -> Result<Response<adminctrl::GenerateTxInclusionProofReply>, Status> {
 
+		let txid = request.into_inner().txid;
+
 		println!("[CIVKITD] - CONTROL: generate tx inclusion proof!");
 
+		let (send, recv) = oneshot::channel::<Option<String>>();
 		{
 			let mut send_bitcoind_request_lock = self.send_bitcoind_request.lock().unwrap();
-			send_bitcoind_request_lock.send(BitcoindRequest::CheckRpcCall);
+			send_bitcoind_request_lock.send(BitcoindRequest::GenerateTxInclusionProof { txid: txid, respond_to: send });
 		}
-
-		Ok(Response::new(adminctrl::GenerateTxInclusionProofReply {}))
+		if let Some(response) = recv.await.expect("BitcoindHandler has been killed") {
+			Ok(Response::new(adminctrl::GenerateTxInclusionProofReply { merkle_block: response } ))
+		} else { Ok(Response::new(adminctrl::GenerateTxInclusionProofReply { merkle_block: String::new() })) }
 	}
 }
 
