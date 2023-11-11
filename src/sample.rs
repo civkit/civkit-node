@@ -15,11 +15,12 @@ use std::process;
 use bitcoin::secp256k1::{PublicKey, SecretKey, Secp256k1, Signature};
 use bitcoin::secp256k1::Message as SecpMessage;
 use bitcoin::blockdata::transaction::Transaction;
-use bitcoin::Txid;
+use bitcoin::{MerkleBlock, Txid};
 use bitcoin::hashes::{Hash, sha256, HashEngine};
+use bitcoin_hashes::hex::FromHex;
 
 use staking_credentials::common::utils::{Credentials, Proof};
-use staking_credentials::common::msgs::{CredentialAuthenticationPayload, ServiceDeliveranceRequest};
+use staking_credentials::common::msgs::{CredentialAuthenticationPayload, Encodable, ServiceDeliveranceRequest};
 
 use nostr::{RelayMessage, EventBuilder, Metadata, Keys, ClientMessage, Kind, Filter, SubscriptionId, Timestamp, Tag};
 
@@ -145,7 +146,7 @@ fn cli() -> Command {
         )
 	.subcommand(
 	    Command::new("submitcredentialproof")
-	    	.args([Arg::new("txid").help("The transaction id").required(true)])
+	    	.args([Arg::new("merkle_block").help("The merkle block").required(true)])
 		.help_template(APPLET_TEMPLATE)
 		.about("Submit a credential proof to the relay"),
 	)
@@ -261,9 +262,7 @@ fn respond(
             let until = Timestamp::from_str(until_raw.unwrap()).unwrap();
             let filter = Filter::new().kinds(kinds).since(since).until(until);
             let client_message = ClientMessage::new_req(id, vec![filter]);
-            let serialized_message = client_message.as_json();
-            tx.unbounded_send(Message::text(serialized_message))
-                .unwrap();
+            let serialized_message = client_message.as_json(); tx.unbounded_send(Message::text(serialized_message)) .unwrap();
         }
         Some(("closesubscription", matches)) => {
             let subscriptionid: Option<&String> = matches.get_one("subscriptionid");
@@ -280,24 +279,23 @@ fn respond(
             return Ok(true);
         }
 	Some(("submitcredentialproof", matches)) => {
-	    let txid_parse: Option<&String> = matches.get_one("txid");
-	    let txid_str = txid_parse.unwrap();
+	    let mb_parse: Option<&String> = matches.get_one("merkle_block");
+	    let mb_str = mb_parse.unwrap();
 
-	    let bytes = txid_str.as_bytes();
-	    let mut enc = Txid::engine();
-	    enc.input(&bytes);
-	    let txid = Txid::from_engine(enc);
-
-	    let proof = Proof::Txid(txid);
+	    let mb_bytes = Vec::from_hex(mb_str).unwrap();
+	    let mb: MerkleBlock = bitcoin::consensus::deserialize(&mb_bytes).unwrap();
+ 
+	    let proof = Proof::MerkleBlock(mb);
 
 	    //TODO: get credentials from sample local holder state
 	    let credentials = vec![Credentials([16;32])];
 
 	    let credential_authentication = CredentialAuthenticationPayload::new(proof, credentials);
 
-	    //TODO: credential_authentication.serialize()
+	    let mut buffer = vec![];
+	    credential_authentication.encode(&mut buffer);
 	    let tags = &[
-		Tag::Credential(vec![]),
+		Tag::Credential(buffer),
 	    ];
 
 	    if let Ok(credential_carrier) =
