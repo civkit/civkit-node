@@ -28,7 +28,7 @@ use staking_credentials::common::msgs::{CredentialAuthenticationResult, Credenti
 use staking_credentials::common::utils::Credentials;
 
 use crate::events::ClientEvents;
-use crate::bitcoind_client::BitcoindClient;
+use crate::bitcoind_client::{BitcoindClient, BitcoindRequest, BitcoindResult};
 
 use tokio::time::{sleep, Duration};
 use tokio::sync::mpsc;
@@ -152,6 +152,9 @@ pub struct CredentialGateway {
 	receive_credential_event_gateway: Mutex<mpsc::UnboundedReceiver<ClientEvents>>,
 	send_credential_events_gateway: Mutex<mpsc::UnboundedSender<ClientEvents>>,
 
+	send_bitcoind_request_gateway: Mutex<mpsc::UnboundedSender<BitcoindRequest>>,
+	receive_bitcoind_result_handler: Mutex<mpsc::UnboundedReceiver<BitcoindResult>>,
+
 	issuance_manager: IssuanceManager,
 	redemption_manager: RedemptionManager,
 
@@ -159,7 +162,7 @@ pub struct CredentialGateway {
 }
 
 impl CredentialGateway {
-	pub fn new(receive_credential_event_gateway: mpsc::UnboundedReceiver<ClientEvents>, send_credential_events_gateway: mpsc::UnboundedSender<ClientEvents>) -> Self {
+	pub fn new(receive_credential_event_gateway: mpsc::UnboundedReceiver<ClientEvents>, send_credential_events_gateway: mpsc::UnboundedSender<ClientEvents>, send_bitcoind_request_gateway: mpsc::UnboundedSender<BitcoindRequest>, receive_bitcoind_result_gateway: mpsc::UnboundedReceiver<BitcoindResult>) -> Self {
 		let bitcoind_client = BitcoindClient::new(String::new(), "0".to_string(), String::new(), String::new());
 		let secp_ctx = Secp256k1::new();
 		//TODO: should be given a path to bitcoind to use the wallet
@@ -191,6 +194,8 @@ impl CredentialGateway {
 			secp_ctx,
 			receive_credential_event_gateway: Mutex::new(receive_credential_event_gateway),
 			send_credential_events_gateway: Mutex::new(send_credential_events_gateway),
+			send_bitcoind_request_gateway: Mutex::new(send_bitcoind_request_gateway),
+			receive_bitcoind_result_handler: Mutex::new(receive_bitcoind_result_gateway),
 			issuance_manager: issuance_manager,
 			redemption_manager: redemption_manager,
 			hosted_services: hosted_services,
