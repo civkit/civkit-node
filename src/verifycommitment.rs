@@ -7,6 +7,7 @@ use bitcoincore_rpc::bitcoin::Txid;
 use std::str::FromStr;
 use hex::{encode, decode};
 use bip32::{ExtendedPublicKey, ExtendedKeyAttrs, PublicKey, DerivationPath, ChildNumber};
+use crate::verifycommitment_test::{MockClient, test_merkle_root};
 
 pub fn verify_commitments(event_commitments: Vec<Vec<u8>>, latest_commitment: Vec<u8>) -> bool {
     let mut concatenated_hash = Vec::new();
@@ -50,53 +51,79 @@ pub fn verify_slot_proof(slot: usize, inclusion_proof: &mut InclusionProof) -> b
 }
 
 pub fn verify_merkle_root_inclusion(txid: String, inclusion_proof: &mut InclusionProof) -> bool {
-    let client = Client::new(format!("{}:{}/", inclusion_proof.config.bitcoind_params.host, inclusion_proof.config.bitcoind_params.port).as_str(),
-                        Auth::UserPass(inclusion_proof.config.bitcoind_params.rpc_user.to_string(),
-                                        inclusion_proof.config.bitcoind_params.rpc_password.to_string())).unwrap();
+    if cfg!(test) {
+        let client = MockClient::new();
+
+        match client.get_raw_transaction_info(&Txid::from_str(&txid).unwrap(), None) {
+            Ok(transaction) => {
+                let script_pubkey_from_tx = encode(&transaction.vout[0].script_pub_key.hex);
+                let merkle_root = decode(test_merkle_root).expect("Invalid merkle root hex string");
+                let initial_public_key_hex = &inclusion_proof.config.mainstay.base_pubkey;
+                let initial_chain_code_hex = &inclusion_proof.config.mainstay.chain_code;
     
-    match client.get_raw_transaction_info(&Txid::from_str(&txid).unwrap(), None) {
-        Ok(transaction) => {
-            let script_pubkey_from_tx = encode(&transaction.vout[0].script_pub_key.hex);
-            let merkle_root = inclusion_proof.merkle_root.lock().unwrap().as_bytes().to_vec();
-            let rev_merkle_root: Vec<u8> = merkle_root.iter().rev().cloned().collect();
-            let rev_merkle_root_hex = encode(rev_merkle_root);
-
-            let path = get_path_from_commitment(rev_merkle_root_hex).unwrap();
-
-            let initial_public_key_hex = &inclusion_proof.config.mainstay.base_pubkey;
-            let initial_chain_code_hex = &inclusion_proof.config.mainstay.chain_code;
-
-            let initial_public_key_bytes = decode(initial_public_key_hex).expect("Invalid public key hex string");
-            let mut public_key_bytes = [0u8; 33];
-            public_key_bytes.copy_from_slice(&initial_public_key_bytes);
-
-            let initial_public_key = bip32::secp256k1::PublicKey::from_bytes(public_key_bytes).expect("Invalid public key");
-            let mut initial_chain_code = decode(initial_chain_code_hex).expect("Invalid chain code hex string");
-            let mut initial_chain_code_array = [0u8; 32];
-            initial_chain_code_array.copy_from_slice(initial_chain_code.as_mut_slice());
-
-            let attrs = ExtendedKeyAttrs {
-                depth: 0,
-                parent_fingerprint: Default::default(),
-                child_number: Default::default(),
-                chain_code: initial_chain_code_array,
-            };
-
-            let initial_extended_pubkey = ExtendedPublicKey::new(initial_public_key, attrs);
-            let (child_pubkey, child_chain_code) = derive_child_key_and_chaincode(&initial_extended_pubkey, &path.to_string());
-            
-            let script = create_1_of_1_multisig_script(child_pubkey);
-
-            let address = bitcoin::Address::p2sh(&script, bitcoin::Network::Bitcoin).unwrap();
-            let script_pubkey = encode(address.script_pubkey());
-                                            
-            return script_pubkey == script_pubkey_from_tx;
+                let script_pubkey = derive_script_pubkey_from_merkle_root(merkle_root, initial_public_key_hex.to_string(), initial_chain_code_hex.to_string());
+                                                
+                return script_pubkey == script_pubkey_from_tx;
+            }
+            Err(error) => {
+                println!("Error: {:?}", error);
+            }
         }
-        Err(error) => {
-            println!("Error: {:?}", error);
+    } else {
+        let client = Client::new(format!("{}:{}/", inclusion_proof.config.bitcoind_params.host, inclusion_proof.config.bitcoind_params.port).as_str(),
+            Auth::UserPass(inclusion_proof.config.bitcoind_params.rpc_user.to_string(),
+                inclusion_proof.config.bitcoind_params.rpc_password.to_string())).unwrap();
+
+        match client.get_raw_transaction_info(&Txid::from_str(&txid).unwrap(), None) {
+            Ok(transaction) => {
+                let script_pubkey_from_tx = encode(&transaction.vout[0].script_pub_key.hex);
+                let merkle_root = inclusion_proof.merkle_root.lock().unwrap().as_bytes().to_vec();
+                let initial_public_key_hex = &inclusion_proof.config.mainstay.base_pubkey;
+                let initial_chain_code_hex = &inclusion_proof.config.mainstay.chain_code;
+    
+                let script_pubkey = derive_script_pubkey_from_merkle_root(merkle_root, initial_public_key_hex.to_string(), initial_chain_code_hex.to_string());
+                                                
+                return script_pubkey == script_pubkey_from_tx;
+            }
+            Err(error) => {
+                println!("Error: {:?}", error);
+            }
         }
-    }
+    };
+    
     return false;
+}
+
+pub fn derive_script_pubkey_from_merkle_root(merkle_root: Vec<u8>, initial_public_key_hex: String, initial_chain_code_hex: String) -> String {
+    let rev_merkle_root: Vec<u8> = merkle_root.iter().rev().cloned().collect();
+    let rev_merkle_root_hex = encode(rev_merkle_root);
+    let path = get_path_from_commitment(rev_merkle_root_hex).unwrap();
+
+    let initial_public_key_bytes = decode(initial_public_key_hex).expect("Invalid public key hex string");
+    let mut public_key_bytes = [0u8; 33];
+    public_key_bytes.copy_from_slice(&initial_public_key_bytes);
+
+    let initial_public_key = bip32::secp256k1::PublicKey::from_bytes(public_key_bytes).expect("Invalid public key");
+    let mut initial_chain_code = decode(initial_chain_code_hex).expect("Invalid chain code hex string");
+    let mut initial_chain_code_array = [0u8; 32];
+    initial_chain_code_array.copy_from_slice(initial_chain_code.as_mut_slice());
+
+    let attrs = ExtendedKeyAttrs {
+        depth: 0,
+        parent_fingerprint: Default::default(),
+        child_number: Default::default(),
+        chain_code: initial_chain_code_array,
+    };
+
+    let initial_extended_pubkey = ExtendedPublicKey::new(initial_public_key, attrs);
+    let (child_pubkey, child_chain_code) = derive_child_key_and_chaincode(&initial_extended_pubkey, &path.to_string());
+    
+    let script = create_1_of_1_multisig_script(child_pubkey);
+
+    let address = bitcoin::Address::p2sh(&script, bitcoin::Network::Bitcoin).unwrap();
+    let script_pubkey = encode(address.script_pubkey());
+
+    script_pubkey
 }
 
 pub fn get_path_from_commitment(commitment: String) -> Option<String> {
