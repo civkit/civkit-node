@@ -89,12 +89,12 @@ impl Default for Config {
                 base_pubkey: "031dd94c5262454986a2f0a6c557d2cbe41ec5a8131c588b9367c9310125a8a7dc".to_string(),
                 chain_code: "0a090f710e47968aee906804f211cf10cde9a11e14908ca0f78cc55dd190ceaa".to_string(),
             },
-            bitcoind_params: BitcoindParams {
-                host: "http://127.0.0.1".to_string(),
-                port: "18443".to_string(), // regtest
-                rpc_user: "civkitd_client".to_string(),
-                rpc_password: "hello_world".to_string(),
-            }
+	    bitcoind_params: BitcoindParams {
+		host: "https://127.0.0.1".to_string(),
+		port: "18443".to_string(), // regtest
+		rpc_user: "civkitd_client".to_string(),
+		rpc_password: "hello_world".to_string(),
+	    }
         }
     }
 }

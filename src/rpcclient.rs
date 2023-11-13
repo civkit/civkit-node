@@ -10,6 +10,7 @@
 /// Simple utilities to query bitcoin RPC API. Inspired by the bitcoin-rpc
 /// crate.
 
+
 use jsonrpc;
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
@@ -34,6 +35,7 @@ pub enum Error {
 	Json(serde_json::error::Error),
 }
 
+
 pub struct Client {
 	client: jsonrpc::client::Client,
 }
@@ -49,7 +51,7 @@ impl Client {
 		} else { return Err(Error::InvalidUserPass) }
 	}
 
-	pub fn call(&self, cmd: &str, args: &[serde_json::Value]) -> Result<(), ()> {
+	pub fn call(&self, cmd: &str, args: &[serde_json::Value]) -> Result<jsonrpc::Response, ()> {
 	
 		if let Ok(raw_args) = args.iter().map(|a| {
 			let json_string = serde_json::to_string(a)?;
@@ -57,12 +59,15 @@ impl Client {
 		}).map(|a| a.map_err(|e| Error::Json(e))).collect::<Result<Vec<_>, Error>>() {
 	
 			let req = self.client.build_request(&cmd, &raw_args);
-		
-			let resp = self.client.send_request(req);
 
-			println!("resp {:?}", resp.unwrap());
+			println!("req {:?}", req);
+		
+			if let Ok(resp) = self.client.send_request(req) {
+				//println!("resp {:?}", resp);
+				return Ok(resp);
+			}
 		}
 
-		Ok(())
+		Err(())
 	}
 }

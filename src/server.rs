@@ -13,6 +13,8 @@ mod servicemanager;
 mod config;
 mod util;
 
+use bitcoin::MerkleBlock;
+
 use crate::util::init_logger;
 use log;
 use std::fs;
@@ -259,16 +261,32 @@ impl AdminCtrl for ServiceManager {
 		Ok(Response::new(adminctrl::ListDbClientsReply {}))
 	}
 
-	async fn check_txid_inclusion(&self, request: Request<adminctrl::CheckTxidInclusionRequest>) -> Result<Response<adminctrl::CheckTxidInclusionReply>, Status> {
+	async fn check_chain_state(&self, request: Request<adminctrl::CheckChainStateRequest>) -> Result<Response<adminctrl::CheckChainStateReply>, Status> {
 
-		println!("[CIVKITD] - CONTROL: check txid inclusion !");
+		println!("[CIVKITD] - CONTROL: check chain state !");
 
 		{
 			let mut send_bitcoind_request_lock = self.send_bitcoind_request.lock().unwrap();
 			send_bitcoind_request_lock.send(BitcoindRequest::CheckRpcCall);
 		}
 
-		Ok(Response::new(adminctrl::CheckTxidInclusionReply {}))
+		Ok(Response::new(adminctrl::CheckChainStateReply {}))
+	}
+
+	async fn generate_tx_inclusion_proof(&self, request: Request<adminctrl::GenerateTxInclusionProofRequest>) -> Result<Response<adminctrl::GenerateTxInclusionProofReply>, Status> {
+
+		let txid = request.into_inner().txid;
+
+		println!("[CIVKITD] - CONTROL: generate tx inclusion proof!");
+
+		let (send, recv) = oneshot::channel::<Option<String>>();
+		{
+			let mut send_bitcoind_request_lock = self.send_bitcoind_request.lock().unwrap();
+			send_bitcoind_request_lock.send(BitcoindRequest::GenerateTxInclusionProof { txid: txid, respond_to: send });
+		}
+		if let Some(response) = recv.await.expect("BitcoindHandler has been killed") {
+			Ok(Response::new(adminctrl::GenerateTxInclusionProofReply { merkle_block: response } ))
+		} else { Ok(Response::new(adminctrl::GenerateTxInclusionProofReply { merkle_block: String::new() })) }
 	}
 }
 
