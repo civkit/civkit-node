@@ -28,7 +28,7 @@ use civkit::credentialgateway::CredentialGateway;
 use civkit::kindprocessor::NoteProcessor;
 use civkit::nodesigner::NodeSigner;
 use civkit::peerhandler::{NoiseGateway, PeerInfo};
-use civkit::bitcoind_client::{BitcoindHandler, BitcoindRequest};
+use civkit::bitcoind_client::{BitcoindHandler, BitcoindRequest, BitcoindResult};
 use civkit::NostrClient;
 
 use civkit::oniongateway::OnionBox;
@@ -390,6 +390,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 	let (manager_send_bitcoind_request, receive_bitcoind_request) = mpsc::unbounded_channel::<(BitcoindRequest)>();
 
+	let (send_bitcoind_request_gateway, receive_bitcoind_request_handler) = mpsc::unbounded_channel::<(BitcoindRequest)>();
+
+	let (send_bitcoind_result_gateway, receive_bitcoind_result_handler) = mpsc::unbounded_channel::<(BitcoindResult)>();
+
 	// The onion message handler...quite empty for now.
 	let onion_box = OnionBox::new();
 
@@ -397,7 +401,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let noise_gateway = NoiseGateway::new(gateway_receive);
 
 	// The staking credentials handler...quite empty for now.
-	let mut credential_gateway = CredentialGateway::new(receive_credential_event_gateway, send_credential_events_gateway);
+	let mut credential_gateway = CredentialGateway::new(receive_credential_event_gateway, send_credential_events_gateway, send_bitcoind_request_gateway, receive_bitcoind_result_handler);
 
 	// The note or service provider...quite empty for now.
 	let mut note_processor = NoteProcessor::new(processor_receive_dbrequests, receive_dbrequests_manager, send_db_result_handler, config.clone());
@@ -412,7 +416,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	// TODO: add receive_credential_events_handler
 	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests, handler_receive_db_result, send_credential_events_handler, config.clone());
 
-	let mut bitcoind_handler = BitcoindHandler::new(config.clone(), receive_bitcoind_request);
+	let mut bitcoind_handler = BitcoindHandler::new(config.clone(), receive_bitcoind_request, receive_bitcoind_request_handler, send_bitcoind_result_gateway);
 
 	// Main handler of services provision.
 	let service_manager = ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, manager_send_bitcoind_request, config.clone());

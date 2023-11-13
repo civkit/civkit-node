@@ -26,6 +26,11 @@ pub enum BitcoindRequest {
 	GenerateTxInclusionProof { txid: String, respond_to: oneshot::Sender<Option<String>> },
 }
 
+#[derive(Debug)]
+pub enum BitcoindResult {
+	ProofValid { hash: [u8; 32], valid: bool }
+}
+
 pub struct BitcoindClient {
 	host: String,
 	port: String,
@@ -58,6 +63,10 @@ pub struct BitcoindHandler {
 
 	receive_bitcoind_request: TokioMutex<mpsc::UnboundedReceiver<BitcoindRequest>>,
 
+	receive_bitcoind_request_gateway: TokioMutex<mpsc::UnboundedReceiver<BitcoindRequest>>,
+
+	send_bitcoind_result_handler: TokioMutex<mpsc::UnboundedSender<BitcoindResult>>,
+
 	bitcoind_client: BitcoindClient,
 
 	rpc_client: Client,
@@ -66,7 +75,7 @@ pub struct BitcoindHandler {
 }
 
 impl BitcoindHandler {
-	pub fn new(config: Config, receive_bitcoind_requests: mpsc::UnboundedReceiver<BitcoindRequest>) -> BitcoindHandler {
+	pub fn new(config: Config, receive_bitcoind_requests: mpsc::UnboundedReceiver<BitcoindRequest>, send_bitcoind_request_gateway: mpsc::UnboundedReceiver<BitcoindRequest>, send_bitcoind_result_handler: mpsc::UnboundedSender<BitcoindResult>) -> BitcoindHandler {
 
 		let bitcoind_client = BitcoindClient {
 			host: config.bitcoind_params.host.clone(),
@@ -84,6 +93,8 @@ impl BitcoindHandler {
 
 		BitcoindHandler {
 			receive_bitcoind_request: TokioMutex::new(receive_bitcoind_requests),
+			receive_bitcoind_request_gateway: TokioMutex::new(send_bitcoind_request_gateway),
+			send_bitcoind_result_handler: TokioMutex::new(send_bitcoind_result_handler),
 			bitcoind_client,
 			rpc_client,
 			config,
