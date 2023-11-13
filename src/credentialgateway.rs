@@ -18,12 +18,14 @@ use bitcoin::network::constants::Network;
 use bitcoin::secp256k1::{PublicKey, SecretKey, Secp256k1};
 use bitcoin::secp256k1;
 
-use nostr::{Event, Kind};
+use nostr::{Event, Kind, Tag};
 
 use staking_credentials::common::msgs::{AssetProofFeatures, CredentialsFeatures, CredentialPolicy, ServicePolicy};
+use staking_credentials::common::utils::Proof;
 use staking_credentials::issuance::issuerstate::IssuerState;
 
-use staking_credentials::common::msgs::{CredentialAuthenticationResult, ServiceDeliveranceResult};
+use staking_credentials::common::msgs::{CredentialAuthenticationResult, CredentialAuthenticationPayload, Decodable, ServiceDeliveranceResult};
+use staking_credentials::common::utils::Credentials;
 
 use crate::events::ClientEvents;
 use crate::bitcoind_client::BitcoindClient;
@@ -52,24 +54,50 @@ impl Default for GatewayConfig {
 	}
 }
 
+struct IssuanceRequest {
+	client_id: u64,
+	pending_credentials: Vec<Credentials>,
+}
+
+enum IssuanceError {
+	InvalidDataCarrier,
+	Parse,
+	Policy
+}
+
+const MAX_CREDENTIALS_PER_REQUEST: usize = 100;
+
+//TODO: protect denial-of-service from client id requests congestion rate
 struct IssuanceManager {
 	request_counter: u64,
-	table_signing_requests: HashMap<u64, u64>,//TODO: add Txid
+	table_signing_requests: HashMap<u64, IssuanceRequest>,
 
 	issuance_engine: IssuerState,
 }
 
 impl IssuanceManager {
-	fn register_authentication_request(&mut self, client_id: u64, ev: Event) -> Result<(u64, Txid), ()> {
+	fn register_authentication_request(&mut self, client_id: u64, ev: Event) -> Result<(u64, Proof), IssuanceError> {
 		let request_id = self.request_counter;
-		self.table_signing_requests.insert(self.request_counter, client_id);
+
+		if ev.tags.len() == 1 {
+			return Err(IssuanceError::InvalidDataCarrier);
+		}
+		let credential_msg_bytes = match &ev.tags[0] {
+			Tag::Credential(credential_bytes) => { credential_bytes },
+			_ => { return Err(IssuanceError::InvalidDataCarrier); },
+		};
+		let credential_authentication = if let Ok(credential_authentication) = CredentialAuthenticationPayload::decode(&credential_msg_bytes) {
+			credential_authentication 
+		} else { return Err(IssuanceError::Parse); };
+
+		if credential_authentication.credentials.len() > MAX_CREDENTIALS_PER_REQUEST {
+			return Err(IssuanceError::Policy);
+		}
+
+		self.table_signing_requests.insert(self.request_counter, IssuanceRequest { client_id, pending_credentials: credential_authentication.credentials });
 		self.request_counter += 1;
 
-		//TODO: verify we hash 32 byte from event
-		let mut enc = Txid::engine();
-		enc.input(ev.content.as_bytes());
-		//TODO: verify we support the proof and credentials
-		Ok((request_id, Txid::from_engine(enc)))
+		Ok((request_id, credential_authentication.proof))
 	}
 
 	fn validate_authentication_request(&mut self, request_id: u64, result: bool) -> Result<CredentialAuthenticationResult, ()> {
@@ -85,8 +113,8 @@ impl IssuanceManager {
 		Err(())
 	}
 	fn get_client_id(&self, request_id: u64) -> u64 {
-		if let Some(client_id) = self.table_signing_requests.get(&request_id) {
-			*client_id
+		if let Some(issuance_request) = self.table_signing_requests.get(&request_id) {
+			issuance_request.client_id
 		} else { 0 }
 	}
 }
@@ -188,9 +216,9 @@ impl CredentialGateway {
 				match event {
 					ClientEvents::Credential { client_id, event } => {
 						if event.kind == Kind::CredentialAuthenticationRequest {
-							if let Ok(txid) = self.issuance_manager.register_authentication_request(client_id, event) {
+							if let Ok(proof) = self.issuance_manager.register_authentication_request(client_id, event) {
 								println!("[CIVKITD] - CREDENTIAL: txid to verify");
-								proofs_to_verify.push(txid);
+								proofs_to_verify.push(proof);
 							}
 						} else if event.kind == Kind::ServiceDeliveranceRequest {
 							// For now validate directly are all information self-contained in redemption manager.
