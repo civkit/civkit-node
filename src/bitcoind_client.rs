@@ -24,6 +24,7 @@ use tokio::time::{sleep, Duration};
 pub enum BitcoindRequest {
 	CheckRpcCall,
 	GenerateTxInclusionProof { txid: String, respond_to: oneshot::Sender<Option<String>> },
+	CheckMerkleProof { proof: String },
 }
 
 #[derive(Debug)]

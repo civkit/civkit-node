@@ -18,7 +18,7 @@ use bitcoin::network::constants::Network;
 use bitcoin::secp256k1::{PublicKey, SecretKey, Secp256k1};
 use bitcoin::secp256k1;
 
-use nostr::{Event, Kind, Tag};
+use nostr::{Event, Kind, Tag, TagKind};
 
 use staking_credentials::common::msgs::{AssetProofFeatures, CredentialsFeatures, CredentialPolicy, ServicePolicy};
 use staking_credentials::common::utils::Proof;
@@ -59,10 +59,11 @@ struct IssuanceRequest {
 	pending_credentials: Vec<Credentials>,
 }
 
+#[derive(Debug)]
 enum IssuanceError {
 	InvalidDataCarrier,
 	Parse,
-	Policy
+	Policy,
 }
 
 const MAX_CREDENTIALS_PER_REQUEST: usize = 100;
@@ -79,13 +80,16 @@ impl IssuanceManager {
 	fn register_authentication_request(&mut self, client_id: u64, ev: Event) -> Result<(u64, Proof), IssuanceError> {
 		let request_id = self.request_counter;
 
-		if ev.tags.len() == 1 {
+		if ev.tags.len() != 1 {
 			return Err(IssuanceError::InvalidDataCarrier);
 		}
-		let credential_msg_bytes = match &ev.tags[0] {
-			Tag::Credential(credential_bytes) => { credential_bytes },
+		let tag = ev.tags.first().unwrap();
+		//TODO: fix nostr deserialization issue
+		let credential_msg_bytes = match tag {
+			Tag::Credential(data) => { data },
 			_ => { return Err(IssuanceError::InvalidDataCarrier); },
 		};
+
 		let credential_authentication = if let Ok(credential_authentication) = CredentialAuthenticationPayload::decode(&credential_msg_bytes) {
 			credential_authentication 
 		} else { return Err(IssuanceError::Parse); };
@@ -216,23 +220,33 @@ impl CredentialGateway {
 			}
 
 			let mut proofs_to_verify = Vec::new();
-			let mut deliverance_result_queue = Vec::new();
+			//TODO: change serialization of credential message from bytes payload to encompass ServiceDelivereRequest.
+			//let mut deliverance_result_queue = Vec::new();
 			for event in credential_queue {
 				match event {
 					ClientEvents::Credential { client_id, event } => {
-						if event.kind == Kind::CredentialAuthenticationRequest {
-							if let Ok(proof) = self.issuance_manager.register_authentication_request(client_id, event) {
-								println!("[CIVKITD] - CREDENTIAL: txid to verify");
-								proofs_to_verify.push(proof);
-							}
-						} else if event.kind == Kind::ServiceDeliveranceRequest {
-							// For now validate directly are all information self-contained in redemption manager.
-							if let Ok(result) = self.redemption_manager.validate_service_deliverance(client_id, event) {
-								deliverance_result_queue.push(result);	
-							}
-						} else {
-							println!("[CIVKITD] - CREDENTIAL: credential event error: unknown kind");
+						match event.tags[0].kind() {
+							TagKind::T => {
+								match self.issuance_manager.register_authentication_request(client_id, event) {
+									Ok(proof) => {
+										println!("[CIVKITD] - CREDENTIAL: adding a merkle block proof to verify");
+										proofs_to_verify.push(proof);
+									},
+									Err(error) => {
+										println!("[CIVKITD] - CREDENTIAL: authentication request error {:?}", error); 
+									}
+								}
+							},
+							_ => { println!("[CIVKITD] - CREDENTIAL: credential event error: unknown kind"); }
 						}
+					 	//if event.kind == Kind::ServiceDeliveranceRequest {
+					 	//	// For now validate directly are all information self-contained in redemption manager.
+					 	//	if let Ok(result) = self.redemption_manager.validate_service_deliverance(client_id, event) {
+					 	//		deliverance_result_queue.push(result);	
+					 	//	}
+					 	//} else {
+					 	//	println!("[CIVKITD] - CREDENTIAL: credential event error: unknown kind");
+					 	//}
 					},
 					_ => {},
 				}
@@ -240,7 +254,9 @@ impl CredentialGateway {
 
 			let mut validated_requests = Vec::new();
 			for (request_id, proof) in proofs_to_verify {
-				//TODO: send txid query to BitcoindClient
+				let mut send_bitcoind_request_lock = self.send_bitcoind_request_gateway.lock();
+				println!("[CIVKITD] - CREDENTIAL: credential check merkle proof");
+				send_bitcoind_request_lock.await.send(BitcoindRequest::CheckMerkleProof { proof: String::new() });
 			}
 
 			let mut authentication_result_queue = Vec::new();
@@ -259,10 +275,10 @@ impl CredentialGateway {
 			}
 
 			{
-				for result in deliverance_result_queue {
-					let mut send_credential_lock = self.send_credential_events_gateway.lock();
-					//TODO: send bakc event
-				}
+				//for result in deliverance_result_queue {
+				//	let mut send_credential_lock = self.send_credential_events_gateway.lock();
+				//	//TODO: send bakc event
+				//}
 			}
 		}
 	}
