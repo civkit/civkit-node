@@ -9,9 +9,9 @@ use hex::{encode, decode};
 use bip32::{ExtendedPublicKey, ExtendedKeyAttrs, PublicKey, DerivationPath, ChildNumber};
 use crate::verifycommitment_test::{MockClient, test_merkle_root};
 
-pub fn verify_commitments(event_commitments: Vec<Vec<u8>>, latest_commitment: Vec<u8>) -> bool {
+pub fn verify_commitments(event_commitments: Vec<Vec<u8>>, inclusion_proof: &mut InclusionProof) -> bool {
     let mut concatenated_hash = Vec::new();
-
+    let mut latest_commitment = inclusion_proof.commitment.lock().unwrap().as_bytes().to_vec();
     for event_commitment in &event_commitments {
         if concatenated_hash.is_empty() {
             concatenated_hash.extend_from_slice(&event_commitments[0]);
