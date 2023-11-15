@@ -38,6 +38,7 @@ use std::str::FromStr;
 const CLIENT_SECRET_KEY: [u8; 32] = [ 59, 148, 11, 85, 134, 130, 61, 253, 2, 174, 59, 70, 27, 180, 51, 107, 94, 203, 174, 253, 102, 39, 170, 146, 46, 252, 4, 143, 236, 12, 136, 28];
 
 struct CredentialsHolder {
+	//TODO: add source of randomness ?
 	state: Vec<([u8; 32], Signature)>,
 }
 
@@ -47,11 +48,24 @@ impl CredentialsHolder {
 			state: Vec::new(),
 		}
 	}
+
+	fn generate_credentials(&mut self, num_credentials: u32) -> Vec<Credentials> {
+		//TODO: add source of randomness
+		let mut credentials = Vec::new();
+
+		for num in 0..num_credentials {
+			let c = Credentials([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);
+			credentials.push(c);
+		}
+		credentials
+	}
 }
 
 async fn poll_for_user_input(client_keys: Keys, tx: futures_channel::mpsc::UnboundedSender<Message>) {
 
     println!("Civkit sample startup successful. Enter \"help\" to view available commands");
+
+    let mut credentials_holder = CredentialsHolder::new();
 
     loop {
         print!("> ");
@@ -65,7 +79,7 @@ async fn poll_for_user_input(client_keys: Keys, tx: futures_channel::mpsc::Unbou
             continue;
         }
 
-        match respond(&line, &tx, &client_keys) {
+        match respond(&line, &tx, &client_keys, &mut credentials_holder) {
             Ok(quit) => {
                 if quit {
                     process::exit(0x0100);
@@ -161,6 +175,7 @@ fn respond(
     line: &str,
     tx: &futures_channel::mpsc::UnboundedSender<Message>,
     client_keys: &Keys,
+    credential_holder: &mut CredentialsHolder
 ) -> Result<bool, String> {
     let args = line.split_whitespace().collect::<Vec<&str>>();
     let matches = cli()
@@ -287,8 +302,7 @@ fn respond(
  
 	    let proof = Proof::MerkleBlock(mb);
 
-	    //TODO: get credentials from sample local holder state
-	    let credentials = vec![Credentials([16;32])];
+	    let credentials = credential_holder.generate_credentials(100);
 
 	    let credential_authentication = CredentialAuthenticationPayload::new(proof, credentials);
 
