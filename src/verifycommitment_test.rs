@@ -8,8 +8,9 @@ use bitcoin::BlockHash;
 use bitcoincore_rpc::Client;
 use bitcoincore_rpc::json::{GetRawTransactionResult};
 use serde_json::from_str;
+use serde_json::Value;
 
-const tx_data: &str = r#"
+const TX_DATA_RES: &str = r#"
 {
     "txid": "b891111d35ffc72709140b7bd2a82fde20deca53831f42a96704dede42c793d2",
     "hash": "b891111d35ffc72709140b7bd2a82fde20deca53831f42a96704dede42c793d2",
@@ -46,8 +47,12 @@ const tx_data: &str = r#"
     "confirmations":15235,
     "time":1690540748,
     "blocktime":1690540748
-}"#;
-pub const test_merkle_root: &str = "8d0ad2782d8f6e3f63c6f9611841c239630b55061d558abcc6bac53349edac70";
+}
+"#;
+
+pub const TEST_MERKLE_ROOT: &str = "8d0ad2782d8f6e3f63c6f9611841c239630b55061d558abcc6bac53349edac70";
+
+pub const TXID: &str = "b891111d35ffc72709140b7bd2a82fde20deca53831f42a96704dede42c793d2";
 
 pub struct MockClient {}
 
@@ -55,9 +60,9 @@ impl MockClient {
     pub fn new() -> Self {
       MockClient {}
     }
-    pub fn get_raw_transaction_info(&self, txid: &Txid, blockhash: Option<&BlockHash>) -> Result<GetRawTransactionResult, Box<dyn std::error::Error>> {
-      let tx_info: GetRawTransactionResult = from_str(tx_data)?;
-      Ok(tx_info)
+    pub fn call(command: &str, args: &[serde_json::Value]) -> Result<Value, serde_json::Error> {
+      let response: Value = from_str(TX_DATA_RES).unwrap();
+      Ok(response)
     }
 }
 
@@ -88,6 +93,6 @@ fn test_verify_merkle_root_inclusion() {
         config.clone()
     );
 
-    let result = verify_merkle_root_inclusion("b891111d35ffc72709140b7bd2a82fde20deca53831f42a96704dede42c793d2".to_string(), &mut inclusion_proof);
+    let result = verify_merkle_root_inclusion(TXID.to_string(), &mut inclusion_proof);
     assert_eq!(result, true);
 }

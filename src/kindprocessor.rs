@@ -27,7 +27,7 @@ use crate::util::is_replaceable;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex as TokioMutex;
 use tokio::time::{sleep, Duration};
-use base64::encode;
+use hex::encode;
 
 pub struct NoteProcessor {
 	note_counters: Mutex<u64>,
