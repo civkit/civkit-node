@@ -83,17 +83,17 @@ impl Default for Config {
                 level: "info".to_string(),
             },
             mainstay: Mainstay {
-                url: "http://testnet.mainstay.xyz/api/v1".to_string(),
-                position: 4,
-                token: "dd7a917e-6cc6-4d95-9eed-cc9ebc20f9a9".to_string(),
-                base_pubkey: "021a89d4cdc8559f5aa34894049bcda4b2c648a28d8db29339595114ff3208ead9".to_string(),
+                url: "https://mainstay.xyz/api/v1".to_string(),
+                position: 1,
+                token: "14b2b754-5806-4157-883c-732baf88849c".to_string(),
+                base_pubkey: "031dd94c5262454986a2f0a6c557d2cbe41ec5a8131c588b9367c9310125a8a7dc".to_string(),
                 chain_code: "0a090f710e47968aee906804f211cf10cde9a11e14908ca0f78cc55dd190ceaa".to_string(),
             },
 	    bitcoind_params: BitcoindParams {
-		host: "http://209.250.231.82".to_string(),
-		port: "18332".to_string(), // regtest
-		rpc_user: "someuser".to_string(),
-		rpc_password: "somepass".to_string(),
+		host: "https://127.0.0.1".to_string(),
+		port: "18443".to_string(), // regtest
+		rpc_user: "civkitd_client".to_string(),
+		rpc_password: "hello_world".to_string(),
 	    }
         }
     }
