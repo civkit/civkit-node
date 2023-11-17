@@ -20,7 +20,7 @@ use bitcoin::hashes::{Hash, sha256, HashEngine};
 use bitcoin_hashes::hex::FromHex;
 
 use staking_credentials::common::utils::{Credentials, Proof};
-use staking_credentials::common::msgs::{CredentialAuthenticationPayload, Encodable, ServiceDeliveranceRequest};
+use staking_credentials::common::msgs::{CredentialAuthenticationPayload, Encodable, ServiceDeliveranceRequest, ToHex};
 
 use nostr::{RelayMessage, EventBuilder, Metadata, Keys, ClientMessage, Kind, Filter, SubscriptionId, Timestamp, Tag};
 
@@ -308,8 +308,9 @@ fn respond(
 
 	    let mut buffer = vec![];
 	    credential_authentication.encode(&mut buffer);
+	    let credential_hex_str = buffer.to_hex();
 	    let tags = &[
-		Tag::Credential(buffer),
+		Tag::Credential(credential_hex_str),
 	    ];
 
 	    if let Ok(credential_carrier) =
