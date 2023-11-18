@@ -24,7 +24,7 @@ use staking_credentials::common::msgs::{AssetProofFeatures, CredentialsFeatures,
 use staking_credentials::common::utils::Proof;
 use staking_credentials::issuance::issuerstate::IssuerState;
 
-use staking_credentials::common::msgs::{CredentialAuthenticationResult, CredentialAuthenticationPayload, Decodable, ServiceDeliveranceResult};
+use staking_credentials::common::msgs::{CredentialAuthenticationResult, CredentialAuthenticationPayload, Decodable, ServiceDeliveranceResult, FromHex};
 use staking_credentials::common::utils::Credentials;
 
 use crate::events::ClientEvents;
@@ -83,15 +83,13 @@ impl IssuanceManager {
 		if ev.tags.len() != 1 {
 			return Err(IssuanceError::InvalidDataCarrier);
 		}
-		let tag = ev.tags.first().unwrap();
-		//TODO: fix nostr deserialization issue
-		let credential_msg_bytes = match tag {
-			Tag::Credential(data) => { data },
+		let credential_hex = match &ev.tags[0] {
+			Tag::Credential(credential) => { credential },
 			_ => { return Err(IssuanceError::InvalidDataCarrier); },
 		};
-
+		let credential_msg_bytes = Vec::from_hex(&credential_hex).unwrap();
 		let credential_authentication = if let Ok(credential_authentication) = CredentialAuthenticationPayload::decode(&credential_msg_bytes) {
-			credential_authentication 
+			credential_authentication
 		} else { return Err(IssuanceError::Parse); };
 
 		if credential_authentication.credentials.len() > MAX_CREDENTIALS_PER_REQUEST {
@@ -226,7 +224,7 @@ impl CredentialGateway {
 				match event {
 					ClientEvents::Credential { client_id, event } => {
 						match event.tags[0].kind() {
-							TagKind::T => {
+							TagKind::Credential => {
 								match self.issuance_manager.register_authentication_request(client_id, event) {
 									Ok(proof) => {
 										println!("[CIVKITD] - CREDENTIAL: adding a merkle block proof to verify");
