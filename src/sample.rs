@@ -35,17 +35,21 @@ use tokio_tungstenite::{connect_async, tungstenite::protocol::Message, tungsteni
 
 use std::str::FromStr;
 
+use std::collections::HashMap;
+
 const CLIENT_SECRET_KEY: [u8; 32] = [ 59, 148, 11, 85, 134, 130, 61, 253, 2, 174, 59, 70, 27, 180, 51, 107, 94, 203, 174, 253, 102, 39, 170, 146, 46, 252, 4, 143, 236, 12, 136, 28];
 
 struct CredentialsHolder {
 	//TODO: add source of randomness ?
 	state: Vec<([u8; 32], Signature)>,
+	service_pubkey_to_policy: HashMap<PublicKey, String>, //TODO: add PolicyMessage
 }
 
 impl CredentialsHolder {
 	fn new() -> Self {
 		CredentialsHolder {
 			state: Vec::new(),
+			service_pubkey_to_policy: HashMap::new(),
 		}
 	}
 
@@ -58,6 +62,14 @@ impl CredentialsHolder {
 			credentials.push(c);
 		}
 		credentials
+	}
+
+	fn check_credential(&mut self, service_pubkey: &PublicKey) -> bool {
+		if let Some(policy) = self.service_pubkey_to_policy.get(service_pubkey) {
+			//TODO: check if enough credential
+			return true;
+		}
+		return false;
 	}
 }
 
@@ -223,6 +235,10 @@ fn respond(
         }
 	Some(("sendmarketorder", matches)) => {
 	    let content: Option<&String> = matches.get_one("content");
+	    let board_pk: Option<&String> = matches.get_one("board_pubkey");
+	    let board_pk_str = board_pk.unwrap();
+
+	    let board_pk = PublicKey::from_str(board_pk_str).unwrap();
 
 	    let credentials = vec![];
 	    let signatures = vec![];
@@ -237,14 +253,24 @@ fn respond(
 
 	    let commitment_sig = secp.sign_ecdsa(&msg, &seckey);
 
-	    let mut service_deliverance_request = ServiceDeliveranceRequest::new(credentials, signatures, service_id, commitment_sig);
-	    //TODO: serialize service_deliverance_request
+	    if !credential_holder.check_credential(&board_pk) {
+ 		    println!("Credentials are not enough");
+		    return Ok(true);
+	    }
 
-	    let empty_content = String::new();
-	    if let Ok(kind_3251_event) =
-		EventBuilder::new_service_deliverance_request(&empty_content, &[]).to_event(client_keys)
+	    let mut service_deliverance_request = ServiceDeliveranceRequest::new(credentials, signatures, service_id, commitment_sig);
+
+	    let mut buffer = vec![];
+	    // service_deliverance_request.encode()
+	    let service_deliverance_hex_str = buffer.to_hex();
+	    let tags = &[
+		Tag::Credential(service_deliverance_hex_str),
+	    ];
+
+	    if let Ok(credential_carrier) =
+		EventBuilder::new_text_note("", tags).to_event(client_keys)
 	    {
-	        let client_message = ClientMessage::new_event(kind_3251_event);
+	        let client_message = ClientMessage::new_event(credential_carrier);
 		let serialized_message = client_message.as_json();
 		tx.unbounded_send(Message::text(serialized_message))
 		    .unwrap();
