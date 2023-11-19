@@ -160,7 +160,7 @@ pub struct CredentialGateway {
 	issuance_manager: IssuanceManager,
 	redemption_manager: RedemptionManager,
 
-	hosted_services: HashMap<u64, Service>,
+	hosted_services: HashMap<PublicKey, Service>,
 }
 
 impl CredentialGateway {
@@ -224,6 +224,7 @@ impl CredentialGateway {
 				match event {
 					ClientEvents::Credential { client_id, event } => {
 						match event.tags[0].kind() {
+							//TODO: decode and check the exact credential requested from client
 							TagKind::Credential => {
 								match self.issuance_manager.register_authentication_request(client_id, event) {
 									Ok(proof) => {
@@ -237,14 +238,6 @@ impl CredentialGateway {
 							},
 							_ => { println!("[CIVKITD] - CREDENTIAL: credential event error: unknown kind"); }
 						}
-					 	//if event.kind == Kind::ServiceDeliveranceRequest {
-					 	//	// For now validate directly are all information self-contained in redemption manager.
-					 	//	if let Ok(result) = self.redemption_manager.validate_service_deliverance(client_id, event) {
-					 	//		deliverance_result_queue.push(result);	
-					 	//	}
-					 	//} else {
-					 	//	println!("[CIVKITD] - CREDENTIAL: credential event error: unknown kind");
-					 	//}
 					},
 					_ => {},
 				}
