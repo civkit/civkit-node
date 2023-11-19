@@ -26,11 +26,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let secp_ctx = Secp256k1::new();
 	let pubkey = PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[42;32]).unwrap());
 
-	let request = tonic::Request::new(RegisterRequest {
-		service_pubkey: pubkey.serialize().to_vec()
-	});
+	//let request = tonic::Request::new(RegisterRequest {
+	//	service_pubkey: pubkey.serialize().to_vec()
+	//});
 
-	let response = civkitd_client.register_service(request).await?;
+	//let response = civkitd_client.register_service(request).await?;
 
 	//TODO: step 1 receive queries from Nostr client
 	//		- add new event kind `service payload` 

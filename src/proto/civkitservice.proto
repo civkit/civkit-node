@@ -11,6 +11,8 @@ service CivkitService {
 
 message RegisterRequest {
 	bytes service_pubkey = 1;
+	bytes credential_policy = 2;
+	bytes service_policy = 3;
 }
 
 message RegisterReply {
