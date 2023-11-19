@@ -12,8 +12,11 @@ use crate::rpcclient::{Client, Auth};
 
 use jsonrpc::Response;
 
+use bitcoin::consensus::serialize;
 use bitcoin::{MerkleBlock, Txid};
-use bitcoin_hashes::hex::FromHex;
+use bitcoin_hashes::hex::{ToHex, FromHex};
+
+use staking_credentials::common::utils::Proof;
 
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::Mutex as TokioMutex;
@@ -24,12 +27,12 @@ use tokio::time::{sleep, Duration};
 pub enum BitcoindRequest {
 	CheckRpcCall,
 	GenerateTxInclusionProof { txid: String, respond_to: oneshot::Sender<Option<String>> },
-	CheckMerkleProof { proof: String },
+	CheckMerkleProof { request_id: u64, proof: Proof },
 }
 
 #[derive(Debug)]
 pub enum BitcoindResult {
-	ProofValid { hash: [u8; 32], valid: bool }
+	ProofValid { request_id: u64, valid: bool }
 }
 
 pub struct BitcoindClient {
@@ -106,34 +109,66 @@ impl BitcoindHandler {
 		loop {
 			sleep(Duration::from_millis(1000)).await;
 
-			let mut receive_bitcoind_request_lock = self.receive_bitcoind_request.lock();
-			if let Ok(bitcoind_request) = receive_bitcoind_request_lock.await.try_recv() {
-				match bitcoind_request {
-					BitcoindRequest::CheckRpcCall => {
-						println!("[CIVKITD] - BITCOIND CLIENT: Received rpc call - Test bitcoind");
+			let mut validation_result = Vec::new();
+			{
+				let mut receive_bitcoind_request_lock = self.receive_bitcoind_request.lock();
+				if let Ok(bitcoind_request) = receive_bitcoind_request_lock.await.try_recv() {
+					match bitcoind_request {
+						BitcoindRequest::CheckRpcCall => {
+							println!("[CIVKITD] - BITCOIND CLIENT: Received rpc call - Test bitcoind");
  
-						self.rpc_client.call("getblockchaininfo", &vec![]);
-					},
-					BitcoindRequest::GenerateTxInclusionProof { txid, respond_to } => {
-						println!("[CIVKITD] - BITCOIND CLIENT: Received rpc call - Generate merkle block");
+							self.rpc_client.call("getblockchaininfo", &vec![]);
+						},
+						BitcoindRequest::GenerateTxInclusionProof { txid, respond_to } => {
+							println!("[CIVKITD] - BITCOIND CLIENT: Received rpc call - Generate merkle block");
 
-						let txid_json_value = serde_json::to_value(txid).unwrap();
-						let txid_json = serde_json::Value::Array(vec![txid_json_value]);
+							let txid_json_value = serde_json::to_value(txid).unwrap();
+							let txid_json = serde_json::Value::Array(vec![txid_json_value]);
 
-						if let Ok(response) = self.rpc_client.call("gettxoutproof", &[txid_json]) {
-							if let Some(raw_value) = response.result {
-								let mut mb_string = raw_value.get().to_string();
-								let index = mb_string.find('\"').unwrap();
-								mb_string.remove(index);
-								let index = mb_string.find('\"').unwrap();
-								mb_string.remove(index);
-								//let mb_bytes = Vec::from_hex(&mb_string).unwrap();
-								//let mb: MerkleBlock = bitcoin::consensus::deserialize(&mb_bytes).unwrap();
-								respond_to.send(Some(mb_string));
+							if let Ok(response) = self.rpc_client.call("gettxoutproof", &[txid_json]) {
+								if let Some(raw_value) = response.result {
+									let mut mb_string = raw_value.get().to_string();
+									let index = mb_string.find('\"').unwrap();
+									mb_string.remove(index);
+									let index = mb_string.find('\"').unwrap();
+									mb_string.remove(index);
+									//let mb_bytes = Vec::from_hex(&mb_string).unwrap();
+									//let mb: MerkleBlock = bitcoin::consensus::deserialize(&mb_bytes).unwrap();
+									respond_to.send(Some(mb_string));
+								}
+							} else { respond_to.send(None); }
+						},
+						BitcoindRequest::CheckMerkleProof { request_id, proof } => {
+							println!("[CIVKITD] - BITCOIND CLIENT: Received rpc call - Check merkle proof");
+
+							match proof {
+								Proof::MerkleBlock(merkle_block) => {
+									let hex_string = serialize(&merkle_block).to_hex();
+									let proof_json_value = serde_json::to_value(hex_string).unwrap();
+									let proof_json = serde_json::Value::Array(vec![proof_json_value]);
+
+									if let Ok(response) = self.rpc_client.call("verifytxoutproof", &[proof_json]) {
+										if let Some(raw_value) = response.result {
+											let txid_array = raw_value.get();
+											if txid_array.len() > 0 {
+												validation_result.push(BitcoindResult::ProofValid { request_id, valid: true });
+											}
+										}
+									} else { }
+								},
+								_ => { validation_result.push(BitcoindResult::ProofValid { request_id, valid: false }); }
 							}
-						} else { respond_to.send(None); }
-					},
-					_ => {},
+						},
+						_ => {},
+					}
+				}
+			}
+
+
+			{
+				for result in validation_result {
+					let mut send_bitcoind_result_handler_lock = self.send_bitcoind_result_handler.lock();
+					send_bitcoind_result_handler_lock.await.send(result);
 				}
 			}
 		}

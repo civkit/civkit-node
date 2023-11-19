@@ -250,11 +250,24 @@ impl CredentialGateway {
 				}
 			}
 
-			let mut validated_requests = Vec::new();
 			for (request_id, proof) in proofs_to_verify {
 				let mut send_bitcoind_request_lock = self.send_bitcoind_request_gateway.lock();
 				println!("[CIVKITD] - CREDENTIAL: credential check merkle proof");
-				send_bitcoind_request_lock.await.send(BitcoindRequest::CheckMerkleProof { proof: String::new() });
+				send_bitcoind_request_lock.await.send(BitcoindRequest::CheckMerkleProof { request_id, proof });
+			}
+
+
+			let mut validated_requests = Vec::new();
+			{
+				let mut receive_bitcoind_result_handler_lock = self.receive_bitcoind_result_handler.lock();
+				if let Ok(bitcoind_result) = receive_bitcoind_result_handler_lock.await.try_recv() {
+					match bitcoind_result {
+						BitcoindResult::ProofValid { request_id, valid } => {
+							validated_requests.push((request_id, valid));
+						},
+						_ => { println!("[CIVKITD] - CREDENTIAL: uncorrect Bitcoin backend result"); },
+					}
+				}
 			}
 
 			let mut authentication_result_queue = Vec::new();
@@ -270,13 +283,6 @@ impl CredentialGateway {
 					let mut send_credential_lock = self.send_credential_events_gateway.lock();
 					//TODO: send back event
 				}
-			}
-
-			{
-				//for result in deliverance_result_queue {
-				//	let mut send_credential_lock = self.send_credential_events_gateway.lock();
-				//	//TODO: send bakc event
-				//}
 			}
 		}
 	}
