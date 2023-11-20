@@ -137,7 +137,6 @@ impl RedemptionManager {
 }
 
 struct Service {
-	pubkey: PublicKey,
 	credential_policy: CredentialPolicy,
 	service_policy: ServicePolicy,
 }
@@ -157,6 +156,8 @@ pub struct CredentialGateway {
 	send_bitcoind_request_gateway: Mutex<mpsc::UnboundedSender<BitcoindRequest>>,
 	receive_bitcoind_result_handler: Mutex<mpsc::UnboundedReceiver<BitcoindResult>>,
 
+	receive_events_gateway: Mutex<mpsc::UnboundedReceiver<ClientEvents>>,
+
 	issuance_manager: IssuanceManager,
 	redemption_manager: RedemptionManager,
 
@@ -164,7 +165,7 @@ pub struct CredentialGateway {
 }
 
 impl CredentialGateway {
-	pub fn new(receive_credential_event_gateway: mpsc::UnboundedReceiver<ClientEvents>, send_credential_events_gateway: mpsc::UnboundedSender<ClientEvents>, send_bitcoind_request_gateway: mpsc::UnboundedSender<BitcoindRequest>, receive_bitcoind_result_gateway: mpsc::UnboundedReceiver<BitcoindResult>) -> Self {
+	pub fn new(receive_credential_event_gateway: mpsc::UnboundedReceiver<ClientEvents>, send_credential_events_gateway: mpsc::UnboundedSender<ClientEvents>, send_bitcoind_request_gateway: mpsc::UnboundedSender<BitcoindRequest>, receive_bitcoind_result_gateway: mpsc::UnboundedReceiver<BitcoindResult>, receive_events_gateway: mpsc::UnboundedReceiver<ClientEvents>) -> Self {
 		let bitcoind_client = BitcoindClient::new(String::new(), "0".to_string(), String::new(), String::new());
 		let secp_ctx = Secp256k1::new();
 		//TODO: should be given a path to bitcoind to use the wallet
@@ -198,6 +199,7 @@ impl CredentialGateway {
 			send_credential_events_gateway: Mutex::new(send_credential_events_gateway),
 			send_bitcoind_request_gateway: Mutex::new(send_bitcoind_request_gateway),
 			receive_bitcoind_result_handler: Mutex::new(receive_bitcoind_result_gateway),
+			receive_events_gateway: Mutex::new(receive_events_gateway),
 			issuance_manager: issuance_manager,
 			redemption_manager: redemption_manager,
 			hosted_services: hosted_services,
@@ -275,6 +277,25 @@ impl CredentialGateway {
 				for result in authentication_result_queue {
 					let mut send_credential_lock = self.send_credential_events_gateway.lock();
 					//TODO: send back event
+				}
+			}
+
+			let mut service_registration_request = Vec::new();
+			{
+				let mut receive_events_gateway_lock = self.receive_events_gateway.lock();
+				if let Ok(service_registration) = receive_events_gateway_lock.await.try_recv() {
+					println!("[CIVKITD] - CREDENTIAL: service registration received for processing");
+					service_registration_request.push(service_registration);
+				}
+			}
+
+			// We register civkit services hosted by this credential gateway
+			for service in service_registration_request {
+				match service {
+					ClientEvents::ServiceRegistration { pubkey, credential_policy, service_policy } => {
+						self.hosted_services.insert(pubkey, Service { credential_policy, service_policy });
+					},
+					_ => { }
 				}
 			}
 		}
