@@ -3,10 +3,8 @@ use std::fs;
 use crate::config::Config;
 use crate::inclusionproof::InclusionProof;
 use crate::verifycommitment::{verify_merkle_root_inclusion};
-use bitcoincore_rpc::bitcoin::Txid;
 use bitcoin::BlockHash;
-use bitcoincore_rpc::Client;
-use bitcoincore_rpc::json::{GetRawTransactionResult};
+use crate::rpcclient::Client;
 use serde_json::from_str;
 use serde_json::Value;
 
