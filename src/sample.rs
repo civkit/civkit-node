@@ -20,7 +20,7 @@ use bitcoin::hashes::{Hash, sha256, HashEngine};
 use bitcoin_hashes::hex::FromHex;
 
 use staking_credentials::common::utils::{Credentials, Proof};
-use staking_credentials::common::msgs::{CredentialAuthenticationPayload, Encodable, ServiceDeliveranceRequest, ToHex};
+use staking_credentials::common::msgs::{CredentialAuthenticationPayload, Encodable, ServiceDeliveranceRequest, ToHex, CredentialPolicy, ServicePolicy};
 
 use nostr::{RelayMessage, EventBuilder, Metadata, Keys, ClientMessage, Kind, Filter, SubscriptionId, Timestamp, Tag};
 
@@ -70,6 +70,27 @@ impl CredentialsHolder {
 			return true;
 		}
 		return false;
+	}
+}
+
+struct Service {
+	pubkey: PublicKey,
+	credential_policy: CredentialPolicy,
+	service_policy: ServicePolicy,
+}
+
+struct ServiceRepository {
+	registered_services: Vec<Service>,
+}
+
+impl ServiceRepository {
+	fn new() -> Self {
+		ServiceRepository {
+			registered_services: vec![],
+		}
+	}
+	fn register_new_service(&mut self, new_service: Service) {
+		self.registered_services.push(new_service);
 	}
 }
 
@@ -175,6 +196,12 @@ fn cli() -> Command {
 	    	.args([Arg::new("merkle_block").help("The merkle block").required(true)])
 		.help_template(APPLET_TEMPLATE)
 		.about("Submit a credential proof to the relay"),
+	)
+	.subcommand(
+	    Command::new("addservice")
+	    	.args([Arg::new("publickey").help("The service public key").required(true)])
+		.help_template(APPLET_TEMPLATE)
+		.about("Register manually a service"),
 	)
         .subcommand(
             Command::new("shutdown")
@@ -376,6 +403,8 @@ fn respond(
 
 async fn poll_for_server_output(mut rx: futures_channel::mpsc::UnboundedReceiver<Message>) {
 
+    let mut service_repository = ServiceRepository::new();
+
     loop {
         if let Ok(message) = rx.try_next() {
 			let msg = message.unwrap();
@@ -392,6 +421,7 @@ async fn poll_for_server_output(mut rx: futures_channel::mpsc::UnboundedReceiver
                         RelayMessage::Notice { message } => {
                             println!("\n[NOTICE] {}", message);
                             print!("> ");
+			    //service_repository.register_new_service();
                             io::stdout().flush().unwrap();
 			},
                         RelayMessage::EndOfStoredEvents(sub_id) => {
