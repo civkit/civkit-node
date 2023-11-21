@@ -49,6 +49,8 @@ pub struct ServiceManager
 
 	pub send_bitcoind_request: Mutex<mpsc::UnboundedSender<BitcoindRequest>>,
 
+	pub send_events_gateway: Mutex<mpsc::UnboundedSender<ClientEvents>>,
+
 	our_service_pubkey: PublicKey,
 	config: Config,
 	secp_ctx: Secp256k1<secp256k1::All>,
@@ -56,7 +58,7 @@ pub struct ServiceManager
 
 impl ServiceManager
 {
-	pub fn new(node_signer: Arc<NodeSigner>, anchor_manager: Arc<AnchorManager>, board_events_send: mpsc::UnboundedSender<ClientEvents>, board_peers_send: mpsc::UnboundedSender<PeerInfo>, send_db_request: mpsc::UnboundedSender<DbRequest>, send_bitcoind_request: mpsc::UnboundedSender<BitcoindRequest>, our_config: Config) -> Self {
+	pub fn new(node_signer: Arc<NodeSigner>, anchor_manager: Arc<AnchorManager>, board_events_send: mpsc::UnboundedSender<ClientEvents>, board_peers_send: mpsc::UnboundedSender<PeerInfo>, send_db_request: mpsc::UnboundedSender<DbRequest>, send_bitcoind_request: mpsc::UnboundedSender<BitcoindRequest>, send_gateway_events: mpsc::UnboundedSender<ClientEvents>, our_config: Config) -> Self {
 		let secp_ctx = Secp256k1::new();
 		let pubkey = PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[42;32]).unwrap());
 		ServiceManager {
@@ -67,6 +69,7 @@ impl ServiceManager
 			service_peers_send: Mutex::new(board_peers_send),
 			send_db_request: Mutex::new(send_db_request),
 			send_bitcoind_request: Mutex::new(send_bitcoind_request),
+			send_events_gateway: Mutex::new(send_gateway_events),
 			our_service_pubkey: pubkey,
 			config: our_config,
 			secp_ctx,

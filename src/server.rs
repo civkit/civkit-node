@@ -73,7 +73,7 @@ pub mod civkitservice {
 
 
 #[tonic::async_trait]
-impl AdminCtrl for ServiceManager {
+impl AdminCtrl for std::sync::Arc<ServiceManager> {
 	async fn ping_handle(&self, request: Request<adminctrl::PingRequest>) -> Result<Response<adminctrl::PongRequest>, Status> {
 		let pong = adminctrl::PongRequest {
 			name: format!("{}", request.into_inner().name).into(),
@@ -290,13 +290,28 @@ impl AdminCtrl for ServiceManager {
 	}
 }
 
-struct DummyManager {}
 
 #[tonic::async_trait]
-impl CivkitService for DummyManager {
+impl CivkitService for std::sync::Arc<ServiceManager> {
 	async fn register_service(&self, request: Request<civkitservice::RegisterRequest>) -> Result<Response<civkitservice::RegisterReply>, Status> {
 
 		println!("Received registration");
+
+		let register_info = request.into_inner();
+
+		//TODO: decode credential policy and service policy
+		//let service_registration = ClientEvents::ServiceRegistration {
+		//	pubkey: register_info.pubkey,
+		//	credential_policy: register_info.credential_policy,
+		//	service_policy: register_info.service_policy,
+		//};
+
+		{
+			let mut send_events_gateway_lock = self.send_events_gateway.lock().unwrap();
+			//send_events_gateway_lock.send(service_registratio);
+		}
+
+		//TODO: in the future, RegisterReply should share back information on the hosting policy of the ServiceManager
 
 		Ok(Response::new(civkitservice::RegisterReply { registration_result: 1 }))
 	}
@@ -394,6 +409,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 	let (send_bitcoind_result_gateway, receive_bitcoind_result_handler) = mpsc::unbounded_channel::<(BitcoindResult)>();
 
+	let (send_events_gateway, receive_events_gateway) = mpsc::unbounded_channel::<ClientEvents>();
+
 	// The onion message handler...quite empty for now.
 	let onion_box = OnionBox::new();
 
@@ -401,7 +418,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let noise_gateway = NoiseGateway::new(gateway_receive);
 
 	// The staking credentials handler...quite empty for now.
-	let mut credential_gateway = CredentialGateway::new(receive_credential_event_gateway, send_credential_events_gateway, send_bitcoind_request_gateway, receive_bitcoind_result_handler);
+	let mut credential_gateway = CredentialGateway::new(receive_credential_event_gateway, send_credential_events_gateway, send_bitcoind_request_gateway, receive_bitcoind_result_handler, receive_events_gateway);
 
 	// The note or service provider...quite empty for now.
 	let mut note_processor = NoteProcessor::new(processor_receive_dbrequests, receive_dbrequests_manager, send_db_result_handler, config.clone());
@@ -419,7 +436,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let mut bitcoind_handler = BitcoindHandler::new(config.clone(), receive_bitcoind_request, receive_bitcoind_request_handler, send_bitcoind_result_gateway);
 
 	// Main handler of services provision.
-	let service_manager = ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, manager_send_bitcoind_request, config.clone());
+	let service_manager_arc = Arc::new(ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, manager_send_bitcoind_request, send_events_gateway, config.clone()));
 
 	// We initialize the inclusion proof with txid, commitment and merkle proof as empty strings.
 	let mut inclusion_proof = InclusionProof::new("".to_string(), "".to_string(), "".to_string(), Vec::new(), config.clone());
@@ -427,8 +444,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let addr = format!("[::1]:{}", cli.cli_port).parse()?;
 
 	let service_mngr_svc = Server::builder()
-		.add_service(AdminCtrlServer::new(service_manager))
-		.add_service(CivkitServiceServer::new(DummyManager {}))
+		.add_service(AdminCtrlServer::new(service_manager_arc.clone()))
+		.add_service(CivkitServiceServer::new(service_manager_arc.clone()))
 		.serve(addr);
 
 	let peer_manager = noise_gateway.peer_manager.clone();
