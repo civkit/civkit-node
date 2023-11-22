@@ -38,6 +38,8 @@ pub struct NoteProcessor {
 
 	receive_db_requests_manager: TokioMutex<mpsc::UnboundedReceiver<DbRequest>>,
 
+	//TODO: add buffer of pending write DB for each client.
+
 	config: Config,
 }
 
@@ -77,6 +79,8 @@ impl NoteProcessor {
 	pub async fn run(&mut self) {
 		loop {
 			sleep(Duration::from_millis(1000)).await;
+
+			//TODO: wait for the ServiceDeliveranceResult of the CredentialGateway before to trigger write_new_event_db.
 
 			let mut replay_request = Vec::new();
 			let mut ok_events = Vec::new();

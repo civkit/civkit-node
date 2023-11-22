@@ -22,7 +22,9 @@ use nostr::{Event, Kind, Tag, TagKind};
 
 use staking_credentials::common::msgs::{AssetProofFeatures, CredentialsFeatures, CredentialPolicy, ServicePolicy};
 use staking_credentials::common::utils::Proof;
+
 use staking_credentials::issuance::issuerstate::IssuerState;
+use staking_credentials::redemption::redemption::RedemptionEngine;
 
 use staking_credentials::common::msgs::{CredentialAuthenticationResult, CredentialAuthenticationPayload, Decodable, ServiceDeliveranceResult, FromHex};
 use staking_credentials::common::utils::Credentials;
@@ -122,18 +124,24 @@ impl IssuanceManager {
 
 }
 
-struct RedemptionManager { }
+struct RedemptionManager {
+	redemption_engine: RedemptionEngine,
+}
 
 impl RedemptionManager {
-	fn validate_service_deliverance(&mut self, client_id: u64, ev: Event) -> Result<ServiceDeliveranceResult, ()> {
+	fn validate_service_deliverance(&mut self, client_id: u64, ev: Event) -> ServiceDeliveranceResult {
 
 		let service_id = 0;
 		let ret = false;
 		let reason = vec![];
 
+		//TODO: take a PubklicKey and a Credential and a Signature. Outcome a boolean.
+		//let valid = self.redemption_engine.verify_credentials();
+
 		let mut service_deliverance_result = ServiceDeliveranceResult::new(service_id, ret, reason);
 
-		Ok(service_deliverance_result)
+		// We always return a valid ServiceDeliveranceResult, all errors should be treated as invalid.
+		service_deliverance_result
 	}
 }
 
@@ -189,8 +197,10 @@ impl CredentialGateway {
 			issuance_engine: issuer_state,
 		};
 
-		let redemption_manager = RedemptionManager {
+		let redemption_engine = RedemptionEngine::new();
 
+		let redemption_manager = RedemptionManager {
+			redemption_engine,	
 		};
 
 		let hosted_services = HashMap::new();
@@ -237,25 +247,36 @@ impl CredentialGateway {
 			}
 
 			let mut proofs_to_verify = Vec::new();
+			let mut redemption_result = Vec::new();
 			//TODO: change serialization of credential message from bytes payload to encompass ServiceDelivereRequest.
 			//let mut deliverance_result_queue = Vec::new();
 			for event in credential_queue {
 				match event {
 					ClientEvents::Credential { client_id, event } => {
-						match event.tags[0].kind() {
+						// let credential_msg = event.decode_from_nostr();
+						let credential_type = 0; // credential_msg.get_credential_type();
+						match credential_type {
 							//TODO: decode and check the exact credential requested from client
-							TagKind::Credential => {
+							0 => {
 								match self.issuance_manager.register_authentication_request(client_id, event) {
 									Ok(proof) => {
 										println!("[CIVKITD] - CREDENTIAL: adding a merkle block proof to verify");
 										proofs_to_verify.push(proof);
 									},
 									Err(error) => {
-										println!("[CIVKITD] - CREDENTIAL: authentication request error {:?}", error); 
+										println!("[CIVKITD] - CREDENTIAL: authentication request error {:?}", error);
 									}
 								}
 							},
-							_ => { println!("[CIVKITD] - CREDENTIAL: credential event error: unknown kind"); }
+							1 => { println!("[CIVKITD] - CREDENTIAL event error: gateway should not receive CredentialAuthenticationResult"); },
+							3 => {
+								let result =  self.redemption_manager.validate_service_deliverance(client_id, event);
+								println!("[CIVKITD] - CREDENTIAL: service deliverance validation result {}", result.ret);
+								//TODO: build back Nostr event here ?
+								redemption_result.push(result);
+							},
+							4 => { println!("[CIVKITD] - CREDENTIAL event error: gateway should not receive ServiceDeliveranceResult"); },
+							_ => { println!("[CIVKITD] - CREDENTIAL: credential event error: unknown type"); }
 						}
 					},
 					_ => {},
@@ -267,7 +288,6 @@ impl CredentialGateway {
 				println!("[CIVKITD] - CREDENTIAL: credential check merkle proof");
 				send_bitcoind_request_lock.await.send(BitcoindRequest::CheckMerkleProof { request_id, proof });
 			}
-
 
 			let mut validated_requests = Vec::new();
 			{
@@ -294,6 +314,13 @@ impl CredentialGateway {
 				for result in authentication_result_queue {
 					let mut send_credential_lock = self.send_credential_events_gateway.lock();
 					//TODO: send back event
+				}
+			}
+
+			{
+				for result in redemption_result {
+					let mut send_credential_lock = self.send_credential_events_gateway.lock();
+					//TODO: send back event 
 				}
 			}
 
