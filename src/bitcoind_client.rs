@@ -51,19 +51,8 @@ impl BitcoindClient {
 
 	}
 
-	pub async fn verifytxoutproof(txid: String, slot: usize, mut inclusion_proof: InclusionProof) -> bool {
-		let event_commitments = get_hashes_of_all_events().await.unwrap();
-		if !verify_commitments(event_commitments, &mut inclusion_proof) {
-			return false;
-		}
-		if !verify_slot_proof(slot, &mut inclusion_proof) {
-			return false;
-		}
-		if !verify_merkle_root_inclusion(txid, &mut inclusion_proof) {
-			return false;
-		}
-
-		true
+	pub async fn verifytxoutproof(mut inclusion_proof: InclusionProof) -> bool {
+		return verify_merkle_root_inclusion(&mut inclusion_proof).await;
 	}
 
 	//TODO: run and dispatch call to bitcoind

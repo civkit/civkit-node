@@ -11,17 +11,21 @@ use std::sync::Arc;
 use std::thread;
 use std::sync::Mutex;
 use tokio::time::{sleep, Duration};
-use serde_json::Value;
+use serde_json::{Value, from_str, to_value};
+use crate::verifycommitment::verify_merkle_root_inclusion;
 
 use crate::mainstay::{get_proof};
 use crate::config::Config;
 use crate::nostr_db::{write_new_inclusion_proof_db};
+use crate::rpcclient::{Client, Auth};
 
 pub struct InclusionProof {
     pub txid: Arc<Mutex<String>>,
     pub commitment: Arc<Mutex<String>>,
     pub merkle_root: Arc<Mutex<String>>,
     pub ops: Arc<Mutex<Vec<Ops>>>,
+    pub txoutproof: Arc<Mutex<String>>,
+    pub raw_tx: Arc<Mutex<Value>>,
     pub config: Config,
 }
 
@@ -31,12 +35,14 @@ pub struct Ops {
 }
 
 impl InclusionProof {
-	pub fn new(txid: String, commitment: String, merkle_root: String, ops: Vec<Ops>, our_config: Config) -> Self {
+	pub fn new(txid: String, commitment: String, merkle_root: String, ops: Vec<Ops>, txout_proof: String, raw_tx: Value, our_config: Config) -> Self {
         InclusionProof {
             txid: Arc::new(Mutex::new(txid)),
             commitment: Arc::new(Mutex::new(commitment)),
             merkle_root: Arc::new(Mutex::new(merkle_root)),
             ops: Arc::new(Mutex::new(ops)),
+            txoutproof: Arc::new(Mutex::new(txout_proof)),
+            raw_tx: Arc::new(Mutex::new(raw_tx)),
             config: our_config,
         }
     }
@@ -67,6 +73,25 @@ impl InclusionProof {
                                 Ops { append, commitment }
                             })
                             .collect();
+                        
+                        let client = Client::new(format!("{}:{}/", self.config.bitcoind_params.host, self.config.bitcoind_params.port).as_str(),
+                            Auth::UserPass(self.config.bitcoind_params.rpc_user.to_string(),
+                                self.config.bitcoind_params.rpc_password.to_string())).unwrap();
+                        let txid_json_value = to_value(txid).unwrap();
+                        let txid_json = Value::Array(vec![txid_json_value]);
+                        if let Ok(response) = client.call("gettxoutproof", &[txid_json]) {
+                            if let Some(raw_value) = response.result {
+                                let mut txout_proof = raw_value.get().to_string();
+                                *self.txoutproof.lock().unwrap() = txout_proof;
+                            }
+                        }
+
+                        if let Ok(response) = client.call("getrawtransaction", &[Value::String(txid.to_string()), Value::Bool(true)]) {
+                            if let Some(raw_value) = response.result {
+                                let json_value: Value = from_str(raw_value.get()).unwrap();
+                                *self.raw_tx.lock().unwrap() = json_value;
+                            }
+                        }
                         write_new_inclusion_proof_db(self).await;
                     }
                 },

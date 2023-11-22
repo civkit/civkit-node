@@ -50,20 +50,6 @@ const TX_DATA_RES: &str = r#"
 
 pub const TEST_MERKLE_ROOT: &str = "8d0ad2782d8f6e3f63c6f9611841c239630b55061d558abcc6bac53349edac70";
 
-pub const TXID: &str = "b891111d35ffc72709140b7bd2a82fde20deca53831f42a96704dede42c793d2";
-
-pub struct MockClient {}
-
-impl MockClient {
-    pub fn new() -> Self {
-      MockClient {}
-    }
-    pub fn call(command: &str, args: &[serde_json::Value]) -> Result<Value, serde_json::Error> {
-      let response: Value = from_str(TX_DATA_RES).unwrap();
-      Ok(response)
-    }
-}
-
 #[test]
 fn test_verify_merkle_root_inclusion() {
 
@@ -83,14 +69,17 @@ fn test_verify_merkle_root_inclusion() {
         }
     };
 
+    let json_value: Value = from_str(TX_DATA_RES).unwrap();
     let mut inclusion_proof = InclusionProof::new(
         "".to_string(), 
         "".to_string(), 
-        "".to_string(), 
-        Vec::new(), 
+        TEST_MERKLE_ROOT.to_string(),
+        Vec::new(),
+        "".to_string(),
+        json_value,
         config.clone()
     );
 
-    let result = verify_merkle_root_inclusion(TXID.to_string(), &mut inclusion_proof);
+    let result = verify_merkle_root_inclusion(&mut inclusion_proof);
     assert_eq!(result, true);
 }

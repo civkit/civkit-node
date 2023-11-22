@@ -6,7 +6,6 @@ use crate::rpcclient::{Client, Auth};
 use std::str::FromStr;
 use hex::{encode, decode};
 use bip32::{ExtendedPublicKey, ExtendedKeyAttrs, PublicKey, DerivationPath, ChildNumber};
-use crate::verifycommitment_test::{MockClient, TEST_MERKLE_ROOT};
 use serde_json::{from_str, Value};
 
 pub fn verify_commitments(event_commitments: Vec<Vec<u8>>, inclusion_proof: &mut InclusionProof) -> bool {
@@ -50,49 +49,14 @@ pub fn verify_slot_proof(slot: usize, inclusion_proof: &mut InclusionProof) -> b
     return proof.verify(merkle_root, &[slot], &[*leaf_to_prove], leaf_hashes.len());
 }
 
-pub fn verify_merkle_root_inclusion(txid: String, inclusion_proof: &mut InclusionProof) -> bool {
-    if cfg!(test) {
-        let client = MockClient::new();
-        match MockClient::call("getrawtransaction", &[Value::String(txid), Value::Bool(true)]) {
-            Ok(resp) => {
-                let script_pubkey_from_tx = resp["vout"][0]["scriptPubKey"]["hex"].as_str().unwrap().to_string();
-                let merkle_root = decode(TEST_MERKLE_ROOT).unwrap();
-                let initial_public_key_hex = &inclusion_proof.config.mainstay.base_pubkey;
-                let initial_chain_code_hex = &inclusion_proof.config.mainstay.chain_code;
+pub fn verify_merkle_root_inclusion(inclusion_proof: &mut InclusionProof) -> bool {
+    let script_pubkey_from_tx = &inclusion_proof.raw_tx.lock().unwrap()["vout"][0]["scriptPubKey"]["hex"].as_str().unwrap().to_string();
+    let merkle_root = decode(inclusion_proof.merkle_root.lock().unwrap().as_bytes().to_vec()).unwrap();
+    let initial_public_key_hex = &inclusion_proof.config.mainstay.base_pubkey;
+    let initial_chain_code_hex = &inclusion_proof.config.mainstay.chain_code;
     
-                let script_pubkey = derive_script_pubkey_from_merkle_root(merkle_root, initial_public_key_hex.to_string(), initial_chain_code_hex.to_string());   
-                return script_pubkey == script_pubkey_from_tx;
-            }
-            Err(error) => {
-                println!("Error: {:?}", error);
-            }
-        }
-    } else {
-        let client = Client::new(format!("{}:{}/", inclusion_proof.config.bitcoind_params.host, inclusion_proof.config.bitcoind_params.port).as_str(),
-            Auth::UserPass(inclusion_proof.config.bitcoind_params.rpc_user.to_string(),
-                inclusion_proof.config.bitcoind_params.rpc_password.to_string())).unwrap();
-
-        match client.call("getrawtransaction", &[Value::String(txid), Value::Bool(true)]) {
-            Ok(resp) => {
-                if let Some(raw_value) = resp.result {
-                    let json_value: Value = from_str(raw_value.get()).unwrap();
-                    let script_pubkey_from_tx = json_value["vout"][0]["scriptPubKey"]["hex"].as_str().unwrap().to_string();
-                    let merkle_root = inclusion_proof.merkle_root.lock().unwrap().as_bytes().to_vec();
-                    let initial_public_key_hex = &inclusion_proof.config.mainstay.base_pubkey;
-                    let initial_chain_code_hex = &inclusion_proof.config.mainstay.chain_code;
-        
-                    let script_pubkey = derive_script_pubkey_from_merkle_root(merkle_root, initial_public_key_hex.to_string(), initial_chain_code_hex.to_string());
-                                                    
-                    return script_pubkey == script_pubkey_from_tx;
-                }
-            }
-            Err(error) => {
-                println!("Error: {:?}", error);
-            }
-        }
-    };
-    
-    return false;
+    let script_pubkey = derive_script_pubkey_from_merkle_root(merkle_root, initial_public_key_hex.to_string(), initial_chain_code_hex.to_string());
+    return script_pubkey == *script_pubkey_from_tx;
 }
 
 pub fn derive_script_pubkey_from_merkle_root(merkle_root: Vec<u8>, initial_public_key_hex: String, initial_chain_code_hex: String) -> String {
