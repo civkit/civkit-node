@@ -21,8 +21,7 @@ use tokio::sync::Mutex as TokioMutex;
 use tokio::time::{sleep, Duration};
 
 use crate::inclusionproof::InclusionProof;
-use crate::verifycommitment::{verify_commitments, verify_slot_proof, verify_merkle_root_inclusion};
-use crate::nostr_db::get_hashes_of_all_events;
+use crate::verifycommitment::{verify_merkle_root_inclusion};
 
 #[derive(Debug)]
 pub enum BitcoindRequest {
@@ -52,7 +51,7 @@ impl BitcoindClient {
 	}
 
 	pub async fn verifytxoutproof(mut inclusion_proof: InclusionProof) -> bool {
-		return verify_merkle_root_inclusion(&mut inclusion_proof).await;
+		return verify_merkle_root_inclusion(&mut inclusion_proof);
 	}
 
 	//TODO: run and dispatch call to bitcoind

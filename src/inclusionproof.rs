@@ -12,7 +12,6 @@ use std::thread;
 use std::sync::Mutex;
 use tokio::time::{sleep, Duration};
 use serde_json::{Value, from_str, to_value};
-use crate::verifycommitment::verify_merkle_root_inclusion;
 
 use crate::mainstay::{get_proof};
 use crate::config::Config;
