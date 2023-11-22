@@ -71,6 +71,7 @@ pub struct ClientHandler {
 	handler_receive_db_result: Mutex<mpsc::UnboundedReceiver<ClientEvents>>,
 
 	send_credential_events_handler: Mutex<mpsc::UnboundedSender<ClientEvents>>,
+	receive_credential_events_handler: Mutex<mpsc::UnboundedReceiver<ClientEvents>>,
 
 	filtered_events: HashMap<SubscriptionId, Event>,
 
@@ -121,7 +122,7 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, outgoing_rec
 }
 
 impl ClientHandler {
-	pub fn new(handler_receive: mpsc::UnboundedReceiver<ClientEvents>, connection_receive: mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>, send_db_requests: mpsc::UnboundedSender<DbRequest>, handler_receive_db_result: mpsc::UnboundedReceiver<ClientEvents>, send_credential_events_handler: mpsc::UnboundedSender<ClientEvents>, our_config: Config) -> Self {
+	pub fn new(handler_receive: mpsc::UnboundedReceiver<ClientEvents>, connection_receive: mpsc::UnboundedReceiver<(TcpStream, SocketAddr)>, send_db_requests: mpsc::UnboundedSender<DbRequest>, handler_receive_db_result: mpsc::UnboundedReceiver<ClientEvents>, send_credential_events_handler: mpsc::UnboundedSender<ClientEvents>, receive_credential_events_handler: mpsc::UnboundedReceiver<ClientEvents>, our_config: Config) -> Self {
 
 		let (outgoing_receive, incoming_receive) = mpsc::unbounded_channel::<Vec<u8>>();
 
@@ -142,6 +143,7 @@ impl ClientHandler {
 			handler_receive_db_result: Mutex::new(handler_receive_db_result),
 
 			send_credential_events_handler: Mutex::new(send_credential_events_handler),
+			receive_credential_events_handler: Mutex::new(receive_credential_events_handler),
 
 			filtered_events: HashMap::new(),
 
@@ -190,6 +192,14 @@ impl ClientHandler {
 				// We receive a result of a db query from the DB manager.
 				let mut handler_receive_db_result_lock = self.handler_receive_db_result.lock();
 				if let Ok(event) = handler_receive_db_result_lock.await.try_recv() {
+					client_events.push(event);
+				}
+			}
+
+			{
+				//We receive a result of a credential validation request or service registration from the credential gateway.
+				let mut receive_credential_events_handler_lock = self.receive_credential_events_handler.lock();
+				if let Ok(event) = receive_credential_events_handler_lock.await.try_recv() {
 					client_events.push(event);
 				}
 			}
@@ -257,6 +267,9 @@ impl ClientHandler {
 								Ok(_) => {},
 								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending ok event"); },
 							}
+						},
+						ClientEvents::ServiceRegistration { ref pubkey, ref credential_policy, ref service_policy } => {
+							//TODO: design new nostr events or just use a tag or use a NOTICE ?
 						},
 						_ => {}
 					}

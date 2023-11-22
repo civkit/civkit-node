@@ -119,6 +119,7 @@ impl IssuanceManager {
 			issuance_request.client_id
 		} else { 0 }
 	}
+
 }
 
 struct RedemptionManager { }
@@ -136,9 +137,11 @@ impl RedemptionManager {
 	}
 }
 
+#[derive(Clone)]
 struct Service {
 	credential_policy: CredentialPolicy,
 	service_policy: ServicePolicy,
+	registration_height: u64,
 }
 
 pub struct CredentialGateway {
@@ -162,6 +165,8 @@ pub struct CredentialGateway {
 	redemption_manager: RedemptionManager,
 
 	hosted_services: HashMap<PublicKey, Service>,
+
+	chain_height: u64,
 }
 
 impl CredentialGateway {
@@ -203,7 +208,19 @@ impl CredentialGateway {
 			issuance_manager: issuance_manager,
 			redemption_manager: redemption_manager,
 			hosted_services: hosted_services,
+			chain_height: 0,
 		}
+	}
+
+	fn announce_new_service(&self, since: u64) -> Vec<Service> {
+		let mut to_be_announced_services = Vec::new();
+
+		for (_, service) in self.hosted_services.iter() {
+			if service.registration_height >= since {
+				to_be_announced_services.push((*service).clone());
+			}
+		}
+		to_be_announced_services
 	}
 
 	pub async fn run(&mut self) {
@@ -293,11 +310,13 @@ impl CredentialGateway {
 			for service in service_registration_request {
 				match service {
 					ClientEvents::ServiceRegistration { pubkey, credential_policy, service_policy } => {
-						self.hosted_services.insert(pubkey, Service { credential_policy, service_policy });
+						self.hosted_services.insert(pubkey, Service { credential_policy, service_policy, registration_height: self.chain_height });
 					},
 					_ => { }
 				}
 			}
+
+			//TODO: announce back new policy to the clients
 		}
 	}
 }

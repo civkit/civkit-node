@@ -431,7 +431,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 	// Main handler of Nostr connections.
 	// TODO: add receive_credential_events_handler
-	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests, handler_receive_db_result, send_credential_events_handler, config.clone());
+	let mut client_handler = ClientHandler::new(handler_receive, request_receive, handler_send_dbrequests, handler_receive_db_result, send_credential_events_handler, receive_credential_event_handler, config.clone());
 
 	let mut bitcoind_handler = BitcoindHandler::new(config.clone(), receive_bitcoind_request, receive_bitcoind_request_handler, send_bitcoind_result_gateway);
 
