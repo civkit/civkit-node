@@ -18,6 +18,8 @@ use crate::events::ClientEvents;
 use crate::nostr_db::DbRequest;
 use crate::nostr_db::{write_new_subscription_db, write_new_event_db, write_new_client_db, print_events_db, print_clients_db, query_events_db, get_cumulative_hash_of_last_event};
 
+use nostr::Event;
+
 use crate::config::Config;
 
 use std::sync::Mutex;
@@ -29,6 +31,10 @@ use tokio::sync::Mutex as TokioMutex;
 use tokio::time::{sleep, Duration};
 use base64::encode;
 
+use std::collections::HashMap;
+
+const MAX_PENDING_DB_REQUEST_PER_CLIENT: u64 = 100;
+
 pub struct NoteProcessor {
 	note_counters: Mutex<u64>,
 	current_height: u64,
@@ -38,7 +44,7 @@ pub struct NoteProcessor {
 
 	receive_db_requests_manager: TokioMutex<mpsc::UnboundedReceiver<DbRequest>>,
 
-	//TODO: add buffer of pending write DB for each client.
+	pending_write_db: HashMap<u64, Vec<(u64, Event)>>,
 
 	config: Config,
 }
@@ -53,6 +59,8 @@ impl NoteProcessor {
 			send_db_result_handler: TokioMutex::new(send_db_result_handler),
 
 			receive_db_requests_manager: TokioMutex::new(receive_db_requests_manager),
+
+			pending_write_db: HashMap::new(),
 
 			config: our_config,
 		}
@@ -88,19 +96,11 @@ impl NoteProcessor {
 				let mut receive_db_requests_lock = self.receive_db_requests.lock();
 				if let Ok(db_request) = receive_db_requests_lock.await.try_recv() {
 					match db_request {
-						DbRequest::WriteEvent(ev) => {
-							let event_id = ev.id;
-							if is_replaceable(&ev) {
-								//TODO: build filter and replace event
-								//TODO: If two events have the same timestamp, the event with the lowest id SHOULD be retained, and the other discarded
-								let filter = Filter::new();
-								if let Ok(old_ev) = query_events_db(filter) {
-									//TODO: check if you should query for multiple replaced events
-									write_new_event_db(ev, Some(old_ev)).await;
-								}
+						DbRequest::WriteEvent { client_id, deliverance_id, ev } => {
+							if let Some(write_queue) = self.pending_write_db.get_mut(&client_id) {
+								write_queue.push((deliverance_id, ev));
 							} else {
-								let ret = write_new_event_db(ev, None).await;
-								if ret { ok_events.push(event_id); }
+								self.pending_write_db.insert(client_id, vec![(deliverance_id, ev)]);
 							}
 						},
 						DbRequest::WriteSub(ns) => { write_new_subscription_db(ns); },
@@ -111,6 +111,22 @@ impl NoteProcessor {
 					println!("[CIVKITD] - NOTE PROCESSING: Note processor received DB requests");
 				}
 			}
+
+			//TODO: once service deliverance validation is okay write events to DB.
+			//let event_id = ev.id;
+			//if is_replaceable(&ev) {
+			//	//TODO: build filter and replace event
+			//	//TODO: If two events have the same timestamp, the event with the lowest id SHOULD be retained, and the other discarded
+			//	let filter = Filter::new();
+			//	if let Ok(old_ev) = query_events_db(filter) {
+			//		//TODO: check if you should query for multiple replaced events
+			//		write_new_event_db(ev, Some(old_ev)).await;
+			//	}
+			//} else {
+			//	let ret = write_new_event_db(ev, None).await;
+			//	if ret { ok_events.push(event_id); }
+			//}
+
 
 			{
 				let mut receive_db_requests_manager_lock = self.receive_db_requests_manager.lock();
