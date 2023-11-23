@@ -200,6 +200,7 @@ impl ClientHandler {
 				//We receive a result of a credential validation request or service registration from the credential gateway.
 				let mut receive_credential_events_handler_lock = self.receive_credential_events_handler.lock();
 				if let Ok(event) = receive_credential_events_handler_lock.await.try_recv() {
+					//TODO: if ServiceDeliveranceResult, flush out the internal buffer to store in our NoteProcessor
 					client_events.push(event);
 				}
 			}
@@ -392,6 +393,7 @@ impl ClientHandler {
 								self.filter_events(*msg).await;
 								//TODO: we should link our filtering policy to our db storing,
 								//otherwise this is a severe DoS vector
+								//TODO: move is_ephemeral check when receive result from CredentialGateway is in NoteProcessor
 								if !is_ephemeral(&msg_2) {
 									let db_request = DbRequest::WriteEvent(*msg_2);
 									write_db.push(db_request);
