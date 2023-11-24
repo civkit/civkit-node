@@ -77,6 +77,8 @@ pub struct ClientHandler {
 
 	pending_events: Mutex<Vec<ClientEvents>>,
 
+	deliverance_counter: u64,
+
 	config: Config
 }
 
@@ -148,6 +150,8 @@ impl ClientHandler {
 			filtered_events: HashMap::new(),
 
 			pending_events: Mutex::new(vec![]),
+
+			deliverance_counter: 0,
 
 			config: our_config
 		}
@@ -395,7 +399,8 @@ impl ClientHandler {
 								//otherwise this is a severe DoS vector
 								//TODO: move is_ephemeral check when receive result from CredentialGateway is in NoteProcessor
 								if !is_ephemeral(&msg_2) {
-									let db_request = DbRequest::WriteEvent(*msg_2);
+									self.deliverance_counter += 1;
+									let db_request = DbRequest::WriteEvent { client_id: id, deliverance_id: self.deliverance_counter, ev: *msg_2 };
 									write_db.push(db_request);
 								}
 							},

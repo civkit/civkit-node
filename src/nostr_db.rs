@@ -26,7 +26,7 @@ const CIVKITD_DB_FILE: &str = "civkitd.db";
 
 #[derive(Debug)]
 pub enum DbRequest {
-	WriteEvent(Event),
+	WriteEvent { client_id: u64, deliverance_id: u64, ev: Event },
 	WriteSub(NostrSub),
 	WriteClient(NostrClient),
 	ReplayEvents { client_id: u64, filters: Vec<Filter> },
