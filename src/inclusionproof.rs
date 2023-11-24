@@ -17,6 +17,7 @@ use crate::mainstay::{get_proof};
 use crate::config::Config;
 use crate::nostr_db::{write_new_inclusion_proof_db};
 
+#[derive(Debug, Clone)]
 pub struct InclusionProof {
     pub txid: Arc<Mutex<String>>,
     pub commitment: Arc<Mutex<String>>,
@@ -25,6 +26,7 @@ pub struct InclusionProof {
     pub config: Config,
 }
 
+#[derive(Debug)]
 pub struct Ops {
     pub append: bool,
     pub commitment: String,

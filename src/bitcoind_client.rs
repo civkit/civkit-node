@@ -28,11 +28,12 @@ pub enum BitcoindRequest {
 	CheckRpcCall,
 	GenerateTxInclusionProof { txid: String, respond_to: oneshot::Sender<Option<String>> },
 	CheckMerkleProof { request_id: u64, proof: Proof },
+	VerifyInclusionProof { inclusion_proof: InclusionProof, respond_to: oneshot::Sender<Option<String>> },
 }
 
 #[derive(Debug)]
 pub enum BitcoindResult {
-	ProofValid { request_id: u64, valid: bool }
+	ProofValid { request_id: u64, valid: bool },
 }
 
 pub struct BitcoindClient {
@@ -159,6 +160,12 @@ impl BitcoindHandler {
 								_ => { validation_result.push(BitcoindResult::ProofValid { request_id, valid: false }); }
 							}
 						},
+						BitcoindRequest::VerifyInclusionProof { inclusion_proof, respond_to } => {
+							println!("[CIVKITD] - BITCOIND CLIENT: Received rpc call - Verify inclusion proof");
+	
+							let res = BitcoindClient::verifytxoutproof(inclusion_proof).await;
+							respond_to.send(Some(res.to_string()));
+						}
 						_ => {},
 					}
 				}
