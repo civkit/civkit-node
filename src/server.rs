@@ -289,6 +289,20 @@ impl AdminCtrl for std::sync::Arc<ServiceManager> {
 			Ok(Response::new(adminctrl::GenerateTxInclusionProofReply { merkle_block: response } ))
 		} else { Ok(Response::new(adminctrl::GenerateTxInclusionProofReply { merkle_block: String::new() })) }
 	}
+
+	async fn verify_inclusion_proof(&self, request: Request<adminctrl::VerifyInclusionProofRequest>) -> Result<Response<adminctrl::VerifyInclusionProofReply>, Status> {
+		
+		println!("[CIVKITD] - CONTROL: verify inclusion proof !");
+
+		let (send, recv) = oneshot::channel::<Option<String>>();
+		{
+			let mut send_bitcoind_request_lock = self.send_bitcoind_request.lock().unwrap();
+			send_bitcoind_request_lock.send(BitcoindRequest::VerifyInclusionProof { inclusion_proof: (*self.inclusion_proof).clone(), respond_to: send });
+		}
+		if let Some(response) = recv.await.expect("BitcoindHandler has been killed") {
+			Ok(Response::new(adminctrl::VerifyInclusionProofReply { verified: response } ))
+		} else { Ok(Response::new(adminctrl::VerifyInclusionProofReply { verified: false.to_string() })) }
+	}
 }
 
 
@@ -438,11 +452,11 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 	let mut bitcoind_handler = BitcoindHandler::new(config.clone(), receive_bitcoind_request, receive_bitcoind_request_handler, send_bitcoind_result_gateway);
 
-	// Main handler of services provision.
-	let service_manager_arc = Arc::new(ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, manager_send_bitcoind_request, send_events_gateway, config.clone()));
-
 	// We initialize the inclusion proof with txid, commitment and merkle proof as empty strings.
 	let mut inclusion_proof = InclusionProof::new("".to_string(), "".to_string(), "".to_string(), Vec::new(), "".to_string(), Value::Null, config.clone());
+
+	// Main handler of services provision.
+	let service_manager_arc = Arc::new(ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, manager_send_bitcoind_request, send_events_gateway, Arc::new(inclusion_proof.clone()), config.clone()));
 
 	let addr = format!("[::1]:{}", cli.cli_port).parse()?;
 

@@ -22,6 +22,7 @@ service AdminCtrl {
 	rpc ListDbClients (ListDbClientsRequest) returns (ListDbClientsReply);
 	rpc CheckChainState (CheckChainStateRequest) returns (CheckChainStateReply);
 	rpc GenerateTxInclusionProof (GenerateTxInclusionProofRequest) returns (GenerateTxInclusionProofReply);
+	rpc VerifyInclusionProof (VerifyInclusionProofRequest) returns (VerifyInclusionProofReply);
 }
 
 message PingRequest {
@@ -142,4 +143,11 @@ message GenerateTxInclusionProofRequest {
 
 message GenerateTxInclusionProofReply {
 	string merkle_block = 1;
+}
+
+message VerifyInclusionProofRequest {
+}
+
+message VerifyInclusionProofReply {
+	string verified = 1;
 }
