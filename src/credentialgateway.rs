@@ -37,6 +37,7 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
 use std::collections::HashMap;
+use std::ops::Deref;
 
 #[derive(Copy, Clone, Debug)]
 struct GatewayConfig {
@@ -79,18 +80,10 @@ struct IssuanceManager {
 }
 
 impl IssuanceManager {
-	fn register_authentication_request(&mut self, client_id: u64, ev: Event) -> Result<(u64, Proof), IssuanceError> {
+	fn register_authentication_request(&mut self, client_id: u64, credential_msg_bytes: Vec<u8>) -> Result<(u64, Proof), IssuanceError> {
 		let request_id = self.request_counter;
 
-		if ev.tags.len() != 1 {
-			return Err(IssuanceError::InvalidDataCarrier);
-		}
-		let credential_hex = match &ev.tags[0] {
-			Tag::Credential(credential) => { credential },
-			_ => { return Err(IssuanceError::InvalidDataCarrier); },
-		};
-		let credential_msg_bytes = Vec::from_hex(&credential_hex).unwrap();
-		let credential_authentication = if let Ok(credential_authentication) = CredentialAuthenticationPayload::decode(&credential_msg_bytes) {
+		let credential_authentication = if let Ok(credential_authentication) = CredentialAuthenticationPayload::decode(&mut credential_msg_bytes.deref()) {
 			credential_authentication
 		} else { return Err(IssuanceError::Parse); };
 
@@ -129,7 +122,7 @@ struct RedemptionManager {
 }
 
 impl RedemptionManager {
-	fn validate_service_deliverance(&mut self, client_id: u64, ev: Event) -> ServiceDeliveranceResult {
+	fn validate_service_deliverance(&mut self, client_id: u64, credential_msg_bytes: Vec<u8>) -> ServiceDeliveranceResult {
 
 		let service_id = 0;
 		let ret = false;
@@ -222,6 +215,18 @@ impl CredentialGateway {
 		}
 	}
 
+	fn get_credential_bytes_and_type(&self, ev: Event) -> Result<(u8, Vec<u8>), IssuanceError> {
+		if ev.tags.len() != 1 {
+			return Err(IssuanceError::InvalidDataCarrier);
+		}
+		let credential_hex = match &ev.tags[0] {
+			Tag::Credential(credential) => { credential },
+			_ => { return Err(IssuanceError::InvalidDataCarrier); },
+		};
+		let credential_msg_bytes = Vec::from_hex(&credential_hex).unwrap();
+		Ok((credential_msg_bytes[0], credential_msg_bytes))
+	}
+
 	fn announce_new_service(&self, since: u64) -> Vec<Service> {
 		let mut to_be_announced_services = Vec::new();
 
@@ -253,31 +258,31 @@ impl CredentialGateway {
 			for event in credential_queue {
 				match event {
 					ClientEvents::Credential { client_id, event } => {
-						// let credential_msg = event.decode_from_nostr();
-						let credential_type = 0; // credential_msg.get_credential_type();
-						match credential_type {
-							//TODO: decode and check the exact credential requested from client
-							0 => {
-								match self.issuance_manager.register_authentication_request(client_id, event) {
-									Ok(proof) => {
-										println!("[CIVKITD] - CREDENTIAL: adding a merkle block proof to verify");
-										proofs_to_verify.push(proof);
-									},
-									Err(error) => {
-										println!("[CIVKITD] - CREDENTIAL: authentication request error {:?}", error);
+						if let Ok((credential_type, credential_msg_bytes)) = self.get_credential_bytes_and_type(event) {
+							match credential_type {
+								//TODO: decode and check the exact credential requested from client
+								0 => {
+									match self.issuance_manager.register_authentication_request(client_id, credential_msg_bytes) {
+										Ok(proof) => {
+											println!("[CIVKITD] - CREDENTIAL: adding a merkle block proof to verify");
+											proofs_to_verify.push(proof);
+										},
+										Err(error) => {
+											println!("[CIVKITD] - CREDENTIAL: authentication request error {:?}", error);
+										}
 									}
-								}
-							},
-							1 => { println!("[CIVKITD] - CREDENTIAL event error: gateway should not receive CredentialAuthenticationResult"); },
-							3 => {
-								let result =  self.redemption_manager.validate_service_deliverance(client_id, event);
-								println!("[CIVKITD] - CREDENTIAL: service deliverance validation result {}", result.ret);
-								//TODO: build back Nostr event here ?
-								redemption_result.push(result);
-							},
-							4 => { println!("[CIVKITD] - CREDENTIAL event error: gateway should not receive ServiceDeliveranceResult"); },
-							_ => { println!("[CIVKITD] - CREDENTIAL: credential event error: unknown type"); }
-						}
+								},
+								1 => { println!("[CIVKITD] - CREDENTIAL event error: gateway should not receive CredentialAuthenticationResult"); },
+								3 => {
+									let result =  self.redemption_manager.validate_service_deliverance(client_id, credential_msg_bytes);
+									println!("[CIVKITD] - CREDENTIAL: service deliverance validation result {}", result.ret);
+									//TODO: build back Nostr event here ?
+									redemption_result.push(result);
+								},
+								4 => { println!("[CIVKITD] - CREDENTIAL event error: gateway should not receive ServiceDeliveranceResult"); },
+								_ => { println!("[CIVKITD] - CREDENTIAL: credential event error: unknown type"); }
+							}
+						} else { println!("[CIVKITD] - CREDENTIAL event error: invalid data carrier"); }
 					},
 					_ => {},
 				}
