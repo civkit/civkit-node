@@ -79,7 +79,7 @@ pub struct BitcoindHandler {
 }
 
 impl BitcoindHandler {
-	pub fn new(config: Config, receive_bitcoind_requests: mpsc::UnboundedReceiver<BitcoindRequest>, send_bitcoind_request_gateway: mpsc::UnboundedReceiver<BitcoindRequest>, send_bitcoind_result_handler: mpsc::UnboundedSender<BitcoindResult>) -> BitcoindHandler {
+	pub fn new(config: Config, receive_bitcoind_requests: mpsc::UnboundedReceiver<BitcoindRequest>, receive_bitcoind_request_gateway: mpsc::UnboundedReceiver<BitcoindRequest>, send_bitcoind_result_handler: mpsc::UnboundedSender<BitcoindResult>) -> BitcoindHandler {
 
 		let bitcoind_client = BitcoindClient {
 			host: config.bitcoind_params.host.clone(),
@@ -97,7 +97,7 @@ impl BitcoindHandler {
 
 		BitcoindHandler {
 			receive_bitcoind_request: TokioMutex::new(receive_bitcoind_requests),
-			receive_bitcoind_request_gateway: TokioMutex::new(send_bitcoind_request_gateway),
+			receive_bitcoind_request_gateway: TokioMutex::new(receive_bitcoind_request_gateway),
 			send_bitcoind_result_handler: TokioMutex::new(send_bitcoind_result_handler),
 			bitcoind_client,
 			rpc_client,
@@ -109,7 +109,6 @@ impl BitcoindHandler {
 		loop {
 			sleep(Duration::from_millis(1000)).await;
 
-			let mut validation_result = Vec::new();
 			{
 				let mut receive_bitcoind_request_lock = self.receive_bitcoind_request.lock();
 				if let Ok(bitcoind_request) = receive_bitcoind_request_lock.await.try_recv() {
@@ -138,23 +137,35 @@ impl BitcoindHandler {
 								}
 							} else { respond_to.send(None); }
 						},
+						_ => {},
+					}
+				}
+			}
+
+			let mut validation_result = Vec::new();
+			{
+				let mut receive_bitcoind_request_gateway = self.receive_bitcoind_request_gateway.lock();
+				if let Ok(bitcoind_request) = receive_bitcoind_request_gateway.await.try_recv() {
+					match bitcoind_request {
 						BitcoindRequest::CheckMerkleProof { request_id, proof } => {
 							println!("[CIVKITD] - BITCOIND CLIENT: Received rpc call - Check merkle proof");
 
 							match proof {
 								Proof::MerkleBlock(merkle_block) => {
 									let hex_string = serialize(&merkle_block).to_hex();
-									let proof_json_value = serde_json::to_value(hex_string).unwrap();
-									let proof_json = serde_json::Value::Array(vec![proof_json_value]);
+									let proof_json = serde_json::Value::String(hex_string);
 
 									if let Ok(response) = self.rpc_client.call("verifytxoutproof", &[proof_json]) {
+										println!("got an answer {:?}", response);
 										if let Some(raw_value) = response.result {
+											println!("raw value {}", raw_value);
 											let txid_array = raw_value.get();
 											if txid_array.len() > 0 {
+												println!("[CIVKITD] - BITCOIND CLIENT: Check - Valid proof");
 												validation_result.push(BitcoindResult::ProofValid { request_id, valid: true });
 											}
 										}
-									} else { }
+									} else { println!("[CIVKITD] - No reply from bitcoind"); }
 								},
 								_ => { validation_result.push(BitcoindResult::ProofValid { request_id, valid: false }); }
 							}
@@ -163,7 +174,6 @@ impl BitcoindHandler {
 					}
 				}
 			}
-
 
 			{
 				for result in validation_result {
