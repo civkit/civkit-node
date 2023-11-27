@@ -155,6 +155,7 @@ impl BitcoindHandler {
 									let hex_string = serialize(&merkle_block).to_hex();
 									let proof_json = serde_json::Value::String(hex_string);
 
+									//TODO: verify transaction paid the correct amount to the correct scrippubkey and deliver credential in function ?
 									if let Ok(response) = self.rpc_client.call("verifytxoutproof", &[proof_json]) {
 										println!("got an answer {:?}", response);
 										if let Some(raw_value) = response.result {
