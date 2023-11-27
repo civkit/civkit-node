@@ -16,17 +16,18 @@ use bitcoin::hashes::{sha256d, Hash, HashEngine};
 use bitcoin::network::constants::Network;
 
 use bitcoin::secp256k1::{PublicKey, SecretKey, Secp256k1};
+use bitcoin::secp256k1::rand::thread_rng;
 use bitcoin::secp256k1;
 
-use nostr::{Event, Kind, Tag, TagKind};
+use nostr::{Event, EventBuilder, Keys, Kind, Tag, TagKind};
 
-use staking_credentials::common::msgs::{AssetProofFeatures, CredentialsFeatures, CredentialPolicy, ServicePolicy};
+use staking_credentials::common::msgs::{AssetProofFeatures, CredentialsFeatures, CredentialPolicy, Encodable, ServicePolicy};
 use staking_credentials::common::utils::Proof;
 
 use staking_credentials::issuance::issuerstate::IssuerState;
 use staking_credentials::redemption::redemption::RedemptionEngine;
 
-use staking_credentials::common::msgs::{CredentialAuthenticationResult, CredentialAuthenticationPayload, Decodable, ServiceDeliveranceResult, FromHex};
+use staking_credentials::common::msgs::{CredentialAuthenticationResult, CredentialAuthenticationPayload, Decodable, ServiceDeliveranceResult, FromHex, ToHex};
 use staking_credentials::common::utils::Credentials;
 
 use crate::events::ClientEvents;
@@ -67,6 +68,7 @@ enum IssuanceError {
 	InvalidDataCarrier,
 	Parse,
 	Policy,
+	SignatureError,
 }
 
 const MAX_CREDENTIALS_PER_REQUEST: usize = 100;
@@ -97,17 +99,38 @@ impl IssuanceManager {
 		Ok((request_id, credential_authentication.proof))
 	}
 
-	fn validate_authentication_request(&mut self, request_id: u64, result: bool) -> Result<CredentialAuthenticationResult, ()> {
+	fn validate_authentication_request(&mut self, request_id: u64, result: bool, seckey: SecretKey) -> Result<Event, IssuanceError> {
 		if let Some(request) = self.table_signing_requests.get(&request_id) {
-			//if let Ok(self.issuer_state.authenticate_credentials(request);
 
-			let signatures = vec![];
+			let mut signatures = Vec::with_capacity(request.pending_credentials.len());
+
+			let secp_ctx = Secp256k1::new();
+
+			for c in &request.pending_credentials {
+				//TODO: this is not efficient...
+				let credential_bytes = c.serialize();
+				if let Ok(msg) = secp256k1::Message::from_slice(&credential_bytes[..]) {
+					let sig = secp_ctx.sign_ecdsa(&msg, &seckey);
+					signatures.push(sig);
+				}
+			}
 
 			let mut credential_authentication_result = CredentialAuthenticationResult::new(signatures);
 
-			return Ok(credential_authentication_result)
+			let mut buffer = vec![];
+			credential_authentication_result.encode(&mut buffer);
+			let credential_hex_str = buffer.to_hex();
+			let tags = &[
+				Tag::Credential(credential_hex_str),
+			];
+
+    			let server_event_keys = Keys::generate();
+
+			if let Ok(credential_carrier) = EventBuilder::new_text_note("", tags).to_event(&server_event_keys) {
+				return Ok(credential_carrier);
+			}
 		}
-		Err(())
+		Err(IssuanceError::SignatureError)
 	}
 	fn get_client_id(&self, request_id: u64) -> u64 {
 		if let Some(issuance_request) = self.table_signing_requests.get(&request_id) {
@@ -165,6 +188,8 @@ pub struct CredentialGateway {
 	issuance_manager: IssuanceManager,
 	redemption_manager: RedemptionManager,
 
+	sec_key: SecretKey,
+	//TODO: have each hosted services coming with its own SecretKey, ideally each service should run its own CrecdentialGateway process in the future
 	hosted_services: HashMap<PublicKey, Service>,
 
 	chain_height: u64,
@@ -174,7 +199,6 @@ impl CredentialGateway {
 	pub fn new(receive_credential_event_gateway: mpsc::UnboundedReceiver<ClientEvents>, send_credential_events_gateway: mpsc::UnboundedSender<ClientEvents>, send_bitcoind_request_gateway: mpsc::UnboundedSender<BitcoindRequest>, receive_bitcoind_result_gateway: mpsc::UnboundedReceiver<BitcoindResult>, receive_events_gateway: mpsc::UnboundedReceiver<ClientEvents>) -> Self {
 		let bitcoind_client = BitcoindClient::new(String::new(), "0".to_string(), String::new(), String::new());
 		let secp_ctx = Secp256k1::new();
-		//TODO: should be given a path to bitcoind to use the wallet
 
 		let secp_ctx = Secp256k1::new();
 		let pubkey = PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[42;32]).unwrap());
@@ -198,6 +222,8 @@ impl CredentialGateway {
 
 		let hosted_services = HashMap::new();
 
+		let secret_key = SecretKey::new(&mut thread_rng());
+
 		CredentialGateway {
 			bitcoind_client: bitcoind_client,
 			genesis_hash: genesis_block(Network::Testnet).header.block_hash(),
@@ -210,6 +236,7 @@ impl CredentialGateway {
 			receive_events_gateway: Mutex::new(receive_events_gateway),
 			issuance_manager: issuance_manager,
 			redemption_manager: redemption_manager,
+			sec_key: secret_key,
 			hosted_services: hosted_services,
 			chain_height: 0,
 		}
@@ -309,7 +336,7 @@ impl CredentialGateway {
 
 			let mut authentication_result_queue = Vec::new();
 			for (request_id, validation_result) in validated_requests {
-				if let Ok(result) = self.issuance_manager.validate_authentication_request(request_id, validation_result) {
+				if let Ok(result) = self.issuance_manager.validate_authentication_request(request_id, validation_result, self.sec_key) {
 					let client_id = self.issuance_manager.get_client_id(request_id);
 					authentication_result_queue.push((client_id, result));
 				}
