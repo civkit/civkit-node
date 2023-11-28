@@ -100,6 +100,16 @@ impl CredentialsHolder {
 	fn store_credentials(&mut self, mut credentials: Vec<Credentials>) {
 		self.state.0.append(&mut credentials);
 	}
+
+	fn get_signed_credentials(&mut self, num_credential: u64) -> (Vec<Credentials>, Vec<Signature>) {
+		let mut credentials = vec![];
+		let mut signatures = vec![];
+		for i in 0..num_credential {
+			credentials.push(self.state.0.remove(i as usize));
+			signatures.push(self.state.1.remove(i as usize));
+		}
+		(credentials, signatures)
+	}
 }
 
 const GLOBAL_HOLDER: Mutex<CredentialsHolder> = Mutex::new(CredentialsHolder {
@@ -278,23 +288,21 @@ fn respond(
 
 	    let board_pk = PublicKey::from_str(board_pk_str).unwrap();
 
-	    let credentials = vec![];
-	    let signatures = vec![];
 	    let service_id = 0;
 
-	    let secp = Secp256k1::new();
-	    let msg = b"";
-
-	    let hash_msg = sha256::Hash::hash(msg);
-	    let msg = SecpMessage::from_slice(hash_msg.as_ref()).unwrap();
-	    let seckey = SecretKey::from_slice(&CLIENT_SECRET_KEY).unwrap();
-
-	    let commitment_sig = secp.sign_ecdsa(&msg, &seckey);
-
-	    //if !credential_holder.check_credential(&board_pk) {
- 	    //        println!("Credentials are not enough");
-	    //        return Ok(true);
-	    //}
+	    let mut credentials = vec![];
+	    let mut signatures = vec![];
+	    {
+		if let Ok(mut credential_holder_lock) = GLOBAL_HOLDER.lock() {
+			if !credential_holder_lock.check_credential(&board_pk) {
+				println!("Credentials are not enough");
+				return Ok(true);
+			}
+			let signed_credentials = credential_holder_lock.get_signed_credentials(DEFAULT_CREDENTIAL as u64);
+			credentials = signed_credentials.0;
+			signatures = signed_credentials.1;
+		}
+	    }
 
 	    let mut service_deliverance_request = ServiceDeliveranceRequest::new(credentials, signatures, service_id);
 
