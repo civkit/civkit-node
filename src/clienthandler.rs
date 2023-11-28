@@ -200,12 +200,12 @@ impl ClientHandler {
 				}
 			}
 
+			let mut dispatch_events = Vec::new();
 			{
 				//We receive a result of a credential validation request or service registration from the credential gateway.
 				let mut receive_credential_events_handler_lock = self.receive_credential_events_handler.lock();
 				if let Ok(event) = receive_credential_events_handler_lock.await.try_recv() {
-					//TODO: if ServiceDeliveranceResult, flush out the internal buffer to store in our NoteProcessor
-					client_events.push(event);
+					dispatch_events.push(event);
 				}
 			}
 
@@ -281,7 +281,6 @@ impl ClientHandler {
 				}
 			}
 
-			let mut dispatch_events = Vec::new();
 			{
 
 				let mut pending_events_lock = self.pending_events.lock().await;
@@ -311,6 +310,17 @@ impl ClientHandler {
 									match outgoing_send.send(serialized_message.into_bytes()) {
 										Ok(_) => {},
 										Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending subcribed event"); },
+									}
+								}
+							},
+							ClientEvents::Credential { client_id, event } => {
+								if client_id == map_client_id {
+									let random_sub_id = SubscriptionId::generate();
+									let relay_message = RelayMessage::new_event(random_sub_id, event.clone());
+									let serialized_message = relay_message.as_json();
+									match outgoing_send.send(serialized_message.into_bytes()) {
+										Ok(_) => {},
+										Err(_) => { println!("[CIVKITD - NOSTR: Error inter thread sending subscribed event"); },
 									}
 								}
 							},

@@ -20,7 +20,7 @@ use bitcoin::hashes::{Hash, sha256, HashEngine};
 use bitcoin_hashes::hex::FromHex;
 
 use staking_credentials::common::utils::{Credentials, Proof};
-use staking_credentials::common::msgs::{CredentialAuthenticationPayload, Encodable, ServiceDeliveranceRequest, ToHex, CredentialPolicy, ServicePolicy};
+use staking_credentials::common::msgs::{CredentialAuthenticationPayload, CredentialAuthenticationResult, Encodable, Decodable, ServiceDeliveranceRequest, ToHex, CredentialPolicy, ServicePolicy};
 
 use nostr::{RelayMessage, EventBuilder, Metadata, Keys, ClientMessage, Kind, Filter, SubscriptionId, Timestamp, Tag};
 
@@ -36,20 +36,30 @@ use tokio_tungstenite::{connect_async, tungstenite::protocol::Message, tungsteni
 use std::str::FromStr;
 
 use std::collections::HashMap;
+use std::sync::Mutex;
+use std::ops::Deref;
 
 const CLIENT_SECRET_KEY: [u8; 32] = [ 59, 148, 11, 85, 134, 130, 61, 253, 2, 174, 59, 70, 27, 180, 51, 107, 94, 203, 174, 253, 102, 39, 170, 146, 46, 252, 4, 143, 236, 12, 136, 28];
 
+struct Service {
+	pubkey: PublicKey,
+	credential_policy: CredentialPolicy,
+	service_policy: ServicePolicy,
+}
+
 struct CredentialsHolder {
 	//TODO: add source of randomness ?
-	state: Vec<([u8; 32], Signature)>,
-	service_pubkey_to_policy: HashMap<PublicKey, String>, //TODO: add PolicyMessage
+	state: Vec<(Vec<Signature>)>,
+	service_pubkey_to_policy: Vec<(PublicKey, String)>, //TODO: add PolicyMessage
+	registered_services: Vec<Service>,
 }
 
 impl CredentialsHolder {
 	fn new() -> Self {
 		CredentialsHolder {
 			state: Vec::new(),
-			service_pubkey_to_policy: HashMap::new(),
+			service_pubkey_to_policy: Vec::new(),
+			registered_services: Vec::new(),
 		}
 	}
 
@@ -65,34 +75,29 @@ impl CredentialsHolder {
 	}
 
 	fn check_credential(&mut self, service_pubkey: &PublicKey) -> bool {
-		if let Some(policy) = self.service_pubkey_to_policy.get(service_pubkey) {
-			//TODO: check if enough credential
-			return true;
+		for service in &self.service_pubkey_to_policy {
+			if *service_pubkey == service.0 {
+				//TODO: check if enough credential
+				return true;
+			}
 		}
 		return false;
 	}
-}
 
-struct Service {
-	pubkey: PublicKey,
-	credential_policy: CredentialPolicy,
-	service_policy: ServicePolicy,
-}
-
-struct ServiceRepository {
-	registered_services: Vec<Service>,
-}
-
-impl ServiceRepository {
-	fn new() -> Self {
-		ServiceRepository {
-			registered_services: vec![],
-		}
-	}
 	fn register_new_service(&mut self, new_service: Service) {
 		self.registered_services.push(new_service);
 	}
+
+	fn store_signatures(&mut self, signatures: Vec<Signature>) {
+		self.state.push((signatures));
+	}
 }
+
+const GLOBAL_HOLDER: Mutex<CredentialsHolder> = Mutex::new(CredentialsHolder {
+	state: Vec::new(),
+	service_pubkey_to_policy: Vec::new(),
+	registered_services: Vec::new()
+});
 
 async fn poll_for_user_input(client_keys: Keys, tx: futures_channel::mpsc::UnboundedSender<Message>) {
 
@@ -285,7 +290,7 @@ fn respond(
 		    return Ok(true);
 	    }
 
-	    let mut service_deliverance_request = ServiceDeliveranceRequest::new(credentials, signatures, service_id, commitment_sig);
+	    let mut service_deliverance_request = ServiceDeliveranceRequest::new(credentials, signatures, service_id);
 
 	    let mut buffer = vec![];
 	    // service_deliverance_request.encode()
@@ -403,8 +408,6 @@ fn respond(
 
 async fn poll_for_server_output(mut rx: futures_channel::mpsc::UnboundedReceiver<Message>) {
 
-    let mut service_repository = ServiceRepository::new();
-
     loop {
         if let Ok(message) = rx.try_next() {
 			let msg = message.unwrap();
@@ -413,6 +416,18 @@ async fn poll_for_server_output(mut rx: futures_channel::mpsc::UnboundedReceiver
                 if let Ok(relay_msg) = RelayMessage::from_json(msg_json) {
                     match relay_msg {
 			RelayMessage::Event { subscription_id, event } => {
+			    if event.tags.len() == 1 {
+			        let credential_hex = match &event.tags[0] {
+					Tag::Credential(credential) => { credential },
+					_ => { continue; }
+				};
+				let credential_msg_bytes = Vec::from_hex(&credential_hex).unwrap();
+				let credential_authentication_result = CredentialAuthenticationResult::decode(&mut credential_msg_bytes.deref()).unwrap();
+				if let Ok(mut credential_holder_lock) = GLOBAL_HOLDER.lock() {
+					println!("[EVENT] storing {} credential signatures from a credentail result", credential_authentication_result.signatures.len());
+					credential_holder_lock.store_signatures(credential_authentication_result.signatures);	
+				}
+			    }
 			    //TODO: NIP 01: `EVENT` messages MUST be sent only with a subscriptionID related to a subscription previously initiated by the client (using the `REQ` message above)`
 			    let display_board_order = if event.kind == Kind::Order { true } else { false };
 			    println!("\n[EVENT] {}  {}", if display_board_order { "new trade offer: " } else { "" }, event.content);
@@ -452,8 +467,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Init client state
     let keys = Keys::generate();
-
-    let credential_state = CredentialsHolder::new();
 
     let (stdin_tx, stdin_rx) = futures_channel::mpsc::unbounded();
     tokio::spawn(poll_for_user_input(keys, stdin_tx));

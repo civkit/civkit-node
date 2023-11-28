@@ -149,12 +149,11 @@ impl RedemptionManager {
 
 		let service_id = 0;
 		let ret = false;
-		let reason = vec![];
 
 		//TODO: take a PubklicKey and a Credential and a Signature. Outcome a boolean.
 		//let valid = self.redemption_engine.verify_credentials();
 
-		let mut service_deliverance_result = ServiceDeliveranceResult::new(service_id, ret, reason);
+		let mut service_deliverance_result = ServiceDeliveranceResult::new(service_id, ret);
 
 		// We always return a valid ServiceDeliveranceResult, all errors should be treated as invalid.
 		service_deliverance_result
@@ -343,9 +342,9 @@ impl CredentialGateway {
 			}
 
 			{
-				for result in authentication_result_queue {
+				for (client_id, event) in authentication_result_queue {
 					let mut send_credential_lock = self.send_credential_events_gateway.lock();
-					//TODO: send back event
+					send_credential_lock.await.send(ClientEvents::Credential { client_id, event: event });
 				}
 			}
 
