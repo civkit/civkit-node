@@ -41,6 +41,8 @@ use std::ops::Deref;
 
 const CLIENT_SECRET_KEY: [u8; 32] = [ 59, 148, 11, 85, 134, 130, 61, 253, 2, 174, 59, 70, 27, 180, 51, 107, 94, 203, 174, 253, 102, 39, 170, 146, 46, 252, 4, 143, 236, 12, 136, 28];
 
+const DEFAULT_CREDENTIAL: u8 = 1;
+
 struct Service {
 	pubkey: PublicKey,
 	credential_policy: CredentialPolicy,
@@ -49,7 +51,7 @@ struct Service {
 
 struct CredentialsHolder {
 	//TODO: add source of randomness ?
-	state: Vec<(Vec<Signature>)>,
+	state: (Vec<Credentials>, Vec<Signature>),
 	service_pubkey_to_policy: Vec<(PublicKey, String)>, //TODO: add PolicyMessage
 	registered_services: Vec<Service>,
 }
@@ -57,7 +59,7 @@ struct CredentialsHolder {
 impl CredentialsHolder {
 	fn new() -> Self {
 		CredentialsHolder {
-			state: Vec::new(),
+			state: (Vec::new(), Vec::new()),
 			service_pubkey_to_policy: Vec::new(),
 			registered_services: Vec::new(),
 		}
@@ -76,9 +78,12 @@ impl CredentialsHolder {
 
 	fn check_credential(&mut self, service_pubkey: &PublicKey) -> bool {
 		for service in &self.service_pubkey_to_policy {
-			if *service_pubkey == service.0 {
-				//TODO: check if enough credential
-				return true;
+			if *service_pubkey == service.0 {		
+				//TODO: for now assume default credential is 1
+				//and all credentials are signed by same key.
+				if self.state.0.len() == DEFAULT_CREDENTIAL as usize {
+					return true;
+				}
 			}
 		}
 		return false;
@@ -88,13 +93,17 @@ impl CredentialsHolder {
 		self.registered_services.push(new_service);
 	}
 
-	fn store_signatures(&mut self, signatures: Vec<Signature>) {
-		self.state.push((signatures));
+	fn store_signatures(&mut self, mut signatures: Vec<Signature>) {
+		self.state.1.append(&mut signatures);
+	}
+
+	fn store_credentials(&mut self, mut credentials: Vec<Credentials>) {
+		self.state.0.append(&mut credentials);
 	}
 }
 
 const GLOBAL_HOLDER: Mutex<CredentialsHolder> = Mutex::new(CredentialsHolder {
-	state: Vec::new(),
+	state: (Vec::new(), Vec::new()),
 	service_pubkey_to_policy: Vec::new(),
 	registered_services: Vec::new()
 });
@@ -102,8 +111,6 @@ const GLOBAL_HOLDER: Mutex<CredentialsHolder> = Mutex::new(CredentialsHolder {
 async fn poll_for_user_input(client_keys: Keys, tx: futures_channel::mpsc::UnboundedSender<Message>) {
 
     println!("Civkit sample startup successful. Enter \"help\" to view available commands");
-
-    let mut credentials_holder = CredentialsHolder::new();
 
     loop {
         print!("> ");
@@ -117,7 +124,7 @@ async fn poll_for_user_input(client_keys: Keys, tx: futures_channel::mpsc::Unbou
             continue;
         }
 
-        match respond(&line, &tx, &client_keys, &mut credentials_holder) {
+        match respond(&line, &tx, &client_keys) {
             Ok(quit) => {
                 if quit {
                     process::exit(0x0100);
@@ -218,8 +225,7 @@ fn cli() -> Command {
 fn respond(
     line: &str,
     tx: &futures_channel::mpsc::UnboundedSender<Message>,
-    client_keys: &Keys,
-    credential_holder: &mut CredentialsHolder
+    client_keys: &Keys 
 ) -> Result<bool, String> {
     let args = line.split_whitespace().collect::<Vec<&str>>();
     let matches = cli()
@@ -285,10 +291,10 @@ fn respond(
 
 	    let commitment_sig = secp.sign_ecdsa(&msg, &seckey);
 
-	    if !credential_holder.check_credential(&board_pk) {
- 		    println!("Credentials are not enough");
-		    return Ok(true);
-	    }
+	    //if !credential_holder.check_credential(&board_pk) {
+ 	    //        println!("Credentials are not enough");
+	    //        return Ok(true);
+	    //}
 
 	    let mut service_deliverance_request = ServiceDeliveranceRequest::new(credentials, signatures, service_id);
 
@@ -360,10 +366,15 @@ fn respond(
  
 	    let proof = Proof::MerkleBlock(mb);
 
-	    let credentials = credential_holder.generate_credentials(100);
+	    let mut credentials = vec![];
+	    {
+		if let Ok(mut credential_holder_lock) = GLOBAL_HOLDER.lock() {
+			credentials = credential_holder_lock.generate_credentials(100);
+			credential_holder_lock.store_credentials(credentials.clone());
+		}
+	    }
 
 	    let credential_authentication = CredentialAuthenticationPayload::new(proof, credentials);
-
 	    let mut buffer = vec![];
 	    credential_authentication.encode(&mut buffer);
 	    let credential_hex_str = buffer.to_hex();
