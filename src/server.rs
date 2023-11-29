@@ -43,6 +43,8 @@ use adminctrl::admin_ctrl_server::{AdminCtrl, AdminCtrlServer};
 
 use crate::civkitservice::civkit_service_server::{CivkitService, CivkitServiceServer};
 
+use crate::civkitservice::civkit_service_client::CivkitServiceClient;
+
 use clap::Parser;
 
 use nostr::{Keys, EventBuilder};
@@ -52,6 +54,7 @@ use std::net::SocketAddr;
 use std::process;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
@@ -289,20 +292,6 @@ impl AdminCtrl for std::sync::Arc<ServiceManager> {
 			Ok(Response::new(adminctrl::GenerateTxInclusionProofReply { merkle_block: response } ))
 		} else { Ok(Response::new(adminctrl::GenerateTxInclusionProofReply { merkle_block: String::new() })) }
 	}
-
-	async fn verify_inclusion_proof(&self, request: Request<adminctrl::VerifyInclusionProofRequest>) -> Result<Response<adminctrl::VerifyInclusionProofReply>, Status> {
-		
-		println!("[CIVKITD] - CONTROL: verify inclusion proof !");
-
-		let (send, recv) = oneshot::channel::<Option<String>>();
-		{
-			let mut send_bitcoind_request_lock = self.send_bitcoind_request.lock().unwrap();
-			send_bitcoind_request_lock.send(BitcoindRequest::VerifyInclusionProof { inclusion_proof: (*self.inclusion_proof).clone(), respond_to: send });
-		}
-		if let Some(response) = recv.await.expect("BitcoindHandler has been killed") {
-			Ok(Response::new(adminctrl::VerifyInclusionProofReply { verified: response } ))
-		} else { Ok(Response::new(adminctrl::VerifyInclusionProofReply { verified: false.to_string() })) }
-	}
 }
 
 
@@ -343,6 +332,20 @@ impl CivkitService for std::sync::Arc<ServiceManager> {
 		println!("Submit service");
 
 		Ok(Response::new(civkitservice::SubmitReply {}))
+	}
+
+	async fn verify_inclusion_proof(&self, request: Request<civkitservice::VerifyInclusionProofRequest>) -> Result<Response<civkitservice::VerifyInclusionProofReply>, Status> {
+		
+		println!("[CIVKITD] - CONTROL: verify inclusion proof !");
+
+		let (send, recv) = oneshot::channel::<Option<String>>();
+		{
+			let mut send_bitcoind_request_lock = self.send_bitcoind_request.lock().unwrap();
+			send_bitcoind_request_lock.send(BitcoindRequest::VerifyInclusionProof { inclusion_proof: (*self.inclusion_proof).clone(), respond_to: send });
+		}
+		if let Some(response) = recv.await.expect("BitcoindHandler has been killed") {
+			Ok(Response::new(civkitservice::VerifyInclusionProofReply { verified: response } ))
+		} else { Ok(Response::new(civkitservice::VerifyInclusionProofReply { verified: false.to_string() })) }
 	}
 }
 
