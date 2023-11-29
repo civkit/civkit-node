@@ -9,7 +9,7 @@
 
 use adminctrl::admin_ctrl_client::AdminCtrlClient;
 //TODO: simplify by using prefix
-use adminctrl::{PingRequest, PongRequest, ShutdownRequest, ShutdownReply, SendNote, ReceivedNote, ListClientRequest, ListSubscriptionRequest, PeerConnectionRequest, DisconnectClientRequest, SendNotice, SendOffer, SendInvoice, ListDbEventsRequest, ListDbClientsRequest, ListDbClientsReply, CheckChainStateRequest, CheckChainStateReply, GenerateTxInclusionProofRequest, GenerateTxInclusionProofReply, VerifyInclusionProofRequest, VerifyInclusionProofReply};
+use adminctrl::{PingRequest, PongRequest, ShutdownRequest, ShutdownReply, SendNote, ReceivedNote, ListClientRequest, ListSubscriptionRequest, PeerConnectionRequest, DisconnectClientRequest, SendNotice, SendOffer, SendInvoice, ListDbEventsRequest, ListDbClientsRequest, ListDbClientsReply, CheckChainStateRequest, CheckChainStateReply, GenerateTxInclusionProofRequest, GenerateTxInclusionProofReply};
 
 use std::env;
 use std::process;
@@ -84,7 +84,6 @@ enum Command {
 	GenerateTxInclusionProof {
 		txid: String,
 	},
-	VerifyInclusionProof,
 }
 
 #[tokio::main]
@@ -221,13 +220,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 			if let Ok(response) = client.generate_tx_inclusion_proof(request).await {
 				println!("tx inclusion proof: {}", response.into_inner().merkle_block);
-			}
-		}
-		Command::VerifyInclusionProof => {
-			let request = tonic::Request::new(VerifyInclusionProofRequest {});
-
-			if let Ok(response) = client.verify_inclusion_proof(request).await {
-				println!("verified: {:?}", response.into_inner().verified);
 			}
 		}
 	}

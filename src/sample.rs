@@ -34,6 +34,11 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message, tungstenite::error::Error};
 
 use std::str::FromStr;
+use crate::civkitservice::civkit_service_client::CivkitServiceClient;
+
+pub mod civkitservice {
+	tonic::include_proto!("civkitservice");
+}
 
 use std::collections::HashMap;
 
@@ -112,7 +117,7 @@ async fn poll_for_user_input(client_keys: Keys, tx: futures_channel::mpsc::Unbou
             continue;
         }
 
-        match respond(&line, &tx, &client_keys, &mut credentials_holder) {
+        match respond(&line, &tx, &client_keys, &mut credentials_holder).await {
             Ok(quit) => {
                 if quit {
                     process::exit(0x0100);
@@ -208,9 +213,14 @@ fn cli() -> Command {
                 .help_template(APPLET_TEMPLATE)
                 .about("Shutdown the REPL"),
         )
+        .subcommand(
+            Command::new("verifyinclusionproof")
+                .help_template(APPLET_TEMPLATE)
+                .about("Verify inclusion proof"),
+        )
 }
 
-fn respond(
+async fn respond(
     line: &str,
     tx: &futures_channel::mpsc::UnboundedSender<Message>,
     client_keys: &Keys,
@@ -392,6 +402,17 @@ fn respond(
 		    .unwrap();
 	    }
 	}
+    Some(("verifyinclusionproof", matches)) => {
+        println!("verifyinclusionproof");
+        
+        let request = tonic::Request::new(civkitservice::VerifyInclusionProofRequest {});
+
+        let mut civkitd_client = CivkitServiceClient::connect(format!("http://[::1]:{}", 50031)).await;
+
+        if let Ok(response) = civkitd_client.unwrap().verify_inclusion_proof(request).await {
+            println!("verified: {:?}", response.into_inner().verified);
+        }
+    }
         _ => {
             println!("Unknown command");
             return Ok(true);
