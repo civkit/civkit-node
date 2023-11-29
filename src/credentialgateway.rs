@@ -147,6 +147,10 @@ struct RedemptionManager {
 impl RedemptionManager {
 	fn validate_service_deliverance(&mut self, client_id: u64, credential_msg_bytes: Vec<u8>) -> ServiceDeliveranceResult {
 
+		//TODO generate PublicKey from SecretKey
+		//TODO: decode bytes as ServiceDeliveranceRequest
+		//TODO: rebuild new event
+
 		let service_id = 0;
 		let ret = false;
 
