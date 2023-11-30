@@ -27,7 +27,7 @@ use staking_credentials::common::utils::Proof;
 use staking_credentials::issuance::issuerstate::IssuerState;
 use staking_credentials::redemption::redemption::RedemptionEngine;
 
-use staking_credentials::common::msgs::{CredentialAuthenticationResult, CredentialAuthenticationPayload, Decodable, ServiceDeliveranceResult, FromHex, ToHex};
+use staking_credentials::common::msgs::{CredentialAuthenticationResult, CredentialAuthenticationPayload, Decodable, ServiceDeliveranceRequest, ServiceDeliveranceResult, FromHex, ToHex};
 use staking_credentials::common::utils::Credentials;
 
 use crate::events::ClientEvents;
@@ -137,7 +137,13 @@ impl IssuanceManager {
 			issuance_request.client_id
 		} else { 0 }
 	}
+}
 
+#[derive(Debug)]
+enum RedemptionError {
+	Parse,
+	BadLength,
+	EventGenerationError,
 }
 
 struct RedemptionManager {
@@ -145,22 +151,44 @@ struct RedemptionManager {
 }
 
 impl RedemptionManager {
-	fn validate_service_deliverance(&mut self, client_id: u64, credential_msg_bytes: Vec<u8>) -> ServiceDeliveranceResult {
+	fn validate_service_deliverance(&mut self, client_id: u64, credential_msg_bytes: Vec<u8>, secret_key: &SecretKey) -> Result<Event, RedemptionError> {
 
-		//TODO generate PublicKey from SecretKey
-		//TODO: decode bytes as ServiceDeliveranceRequest
-		//TODO: rebuild new event
+		let secp_ctx = Secp256k1::new();
+
+		let pubkey = PublicKey::from_secret_key(&secp_ctx, secret_key);
+
+		let service_deliverance = if let Ok(service_deliverance) = ServiceDeliveranceRequest::decode(&mut credential_msg_bytes.deref()) {
+			service_deliverance
+		} else { return Err(RedemptionError::Parse); };
+
+		if service_deliverance.credentials.len() != service_deliverance.signatures.len() { return Err(RedemptionError::BadLength) }
+
+		let mut ret = false;
+		for signed_credentials in service_deliverance.credentials.iter().zip(service_deliverance.signatures.iter()) {
+			let credential_bytes = signed_credentials.0.serialize();
+			if let Ok(msg) = secp256k1::Message::from_slice(&credential_bytes[..]) {
+				ret = secp_ctx.verify_ecdsa(&msg, &signed_credentials.1, &pubkey).is_ok();
+			} // TODO: return an error here
+		}
 
 		let service_id = 0;
 		let ret = false;
 
-		//TODO: take a PubklicKey and a Credential and a Signature. Outcome a boolean.
-		//let valid = self.redemption_engine.verify_credentials();
-
 		let mut service_deliverance_result = ServiceDeliveranceResult::new(service_id, ret);
 
-		// We always return a valid ServiceDeliveranceResult, all errors should be treated as invalid.
-		service_deliverance_result
+		let mut buffer = vec![];
+		service_deliverance_result.encode(&mut buffer);
+		let credential_hex_str = buffer.to_hex();
+		let tags = &[
+			Tag::Credential(credential_hex_str),
+		];
+
+		let server_event_keys = Keys::generate();
+
+		if let Ok(credential_carrier) = EventBuilder::new_text_note("", tags).to_event(&server_event_keys) {
+			return Ok(credential_carrier);
+		}
+		Err(RedemptionError::EventGenerationError)
 	}
 }
 
@@ -304,10 +332,15 @@ impl CredentialGateway {
 								},
 								1 => { println!("[CIVKITD] - CREDENTIAL event error: gateway should not receive CredentialAuthenticationResult"); },
 								3 => {
-									let result =  self.redemption_manager.validate_service_deliverance(client_id, credential_msg_bytes);
-									println!("[CIVKITD] - CREDENTIAL: service deliverance validation result {}", result.ret);
-									//TODO: build back Nostr event here ?
-									redemption_result.push(result);
+									match self.redemption_manager.validate_service_deliverance(client_id, credential_msg_bytes, &self.sec_key) {
+										Ok(result) => {
+											println!("[CIVKITD] - CREDENTIAL: service deliverance validation result");
+											redemption_result.push(result);
+										},
+										Err(error) => {
+											println!("[CIVKITD - CREDENTIAL: authentication request error {:?}", error);
+										}
+									}
 								},
 								4 => { println!("[CIVKITD] - CREDENTIAL event error: gateway should not receive ServiceDeliveranceResult"); },
 								_ => { println!("[CIVKITD] - CREDENTIAL: credential event error: unknown type"); }
