@@ -86,7 +86,8 @@ impl CredentialsHolder {
 				}
 			}
 		}
-		return false;
+		//TODO: for now return always true, implement CredentialGateway self-announcement of its pubkey.
+		return true;
 	}
 
 	fn register_new_service(&mut self, new_service: Service) {
@@ -95,15 +96,18 @@ impl CredentialsHolder {
 
 	fn store_signatures(&mut self, mut signatures: Vec<Signature>) {
 		self.state.1.append(&mut signatures);
+		println!("debug: stored signatures {}", self.state.1.len());
 	}
 
 	fn store_credentials(&mut self, mut credentials: Vec<Credentials>) {
 		self.state.0.append(&mut credentials);
+		println!("debug: stored credentials {}", self.state.0.len());
 	}
 
 	fn get_signed_credentials(&mut self, num_credential: u64) -> (Vec<Credentials>, Vec<Signature>) {
 		let mut credentials = vec![];
 		let mut signatures = vec![];
+		println!("debug: num_credential {} signed credentials {} {}", num_credential, self.state.0.len(), self.state.1.len());
 		for i in 0..num_credential {
 			credentials.push(self.state.0.remove(i as usize));
 			signatures.push(self.state.1.remove(i as usize));
@@ -112,7 +116,7 @@ impl CredentialsHolder {
 	}
 }
 
-const GLOBAL_HOLDER: Mutex<CredentialsHolder> = Mutex::new(CredentialsHolder {
+static GLOBAL_HOLDER: Mutex<CredentialsHolder> = Mutex::new(CredentialsHolder {
 	state: (Vec::new(), Vec::new()),
 	service_pubkey_to_policy: Vec::new(),
 	registered_services: Vec::new()
@@ -192,7 +196,10 @@ fn cli() -> Command {
         )
 	.subcommand(
 	    Command::new("sendmarketorder")
-	    	.args([Arg::new("content").help("the order type (either bolt11 or bolt12)").required(true)])
+	    	.args([
+			Arg::new("content").help("the order type (either bolt11 or bolt12)").required(true),
+			Arg::new("board_pubkey").help("the board pubkey").required(true),	
+		])
 		.help_template(APPLET_TEMPLATE)
 		.about("Send a market order (kind: 32500) to the relay"),
 	)
@@ -307,7 +314,7 @@ fn respond(
 	    let mut service_deliverance_request = ServiceDeliveranceRequest::new(credentials, signatures, service_id);
 
 	    let mut buffer = vec![];
-	    // service_deliverance_request.encode()
+	    service_deliverance_request.encode(&mut buffer);
 	    let service_deliverance_hex_str = buffer.to_hex();
 	    let tags = &[
 		Tag::Credential(service_deliverance_hex_str),
@@ -443,14 +450,16 @@ async fn poll_for_server_output(mut rx: futures_channel::mpsc::UnboundedReceiver
 				let credential_msg_bytes = Vec::from_hex(&credential_hex).unwrap();
 				let credential_authentication_result = CredentialAuthenticationResult::decode(&mut credential_msg_bytes.deref()).unwrap();
 				if let Ok(mut credential_holder_lock) = GLOBAL_HOLDER.lock() {
-					println!("[EVENT] storing {} credential signatures from a credentail result", credential_authentication_result.signatures.len());
+					println!("\n[EVENT] storing {} credential signatures from a credentail result", credential_authentication_result.signatures.len());
 					credential_holder_lock.store_signatures(credential_authentication_result.signatures);	
 				}
+			    } else {
+			    	//TODO: NIP 01: `EVENT` messages MUST be sent only with a subscriptionID related to a subscription previously initiated by the client (using the `REQ` message above)`
+			    	let display_board_order = if event.kind == Kind::Order { true } else { false };
+			    	println!("\n[EVENT] {}  {}", if display_board_order { "new trade offer: " } else { "" }, event.content);
+			    	println!("> ");
+			    	io::stdout().flush().unwrap();
 			    }
-			    //TODO: NIP 01: `EVENT` messages MUST be sent only with a subscriptionID related to a subscription previously initiated by the client (using the `REQ` message above)`
-			    let display_board_order = if event.kind == Kind::Order { true } else { false };
-			    println!("\n[EVENT] {}  {}", if display_board_order { "new trade offer: " } else { "" }, event.content);
-			    io::stdout().flush().unwrap();
 			},
                         RelayMessage::Notice { message } => {
                             println!("\n[NOTICE] {}", message);
