@@ -215,6 +215,7 @@ pub struct CredentialGateway {
 	receive_bitcoind_result_handler: Mutex<mpsc::UnboundedReceiver<BitcoindResult>>,
 
 	receive_events_gateway: Mutex<mpsc::UnboundedReceiver<ClientEvents>>,
+	send_validation_result_gateway: Mutex<mpsc::UnboundedSender<ClientEvents>>,
 
 	issuance_manager: IssuanceManager,
 	redemption_manager: RedemptionManager,
@@ -227,7 +228,7 @@ pub struct CredentialGateway {
 }
 
 impl CredentialGateway {
-	pub fn new(receive_credential_event_gateway: mpsc::UnboundedReceiver<ClientEvents>, send_credential_events_gateway: mpsc::UnboundedSender<ClientEvents>, send_bitcoind_request_gateway: mpsc::UnboundedSender<BitcoindRequest>, receive_bitcoind_result_gateway: mpsc::UnboundedReceiver<BitcoindResult>, receive_events_gateway: mpsc::UnboundedReceiver<ClientEvents>) -> Self {
+	pub fn new(receive_credential_event_gateway: mpsc::UnboundedReceiver<ClientEvents>, send_credential_events_gateway: mpsc::UnboundedSender<ClientEvents>, send_bitcoind_request_gateway: mpsc::UnboundedSender<BitcoindRequest>, receive_bitcoind_result_gateway: mpsc::UnboundedReceiver<BitcoindResult>, receive_events_gateway: mpsc::UnboundedReceiver<ClientEvents>, send_validation_result_gateway: mpsc::UnboundedSender<ClientEvents>) -> Self {
 		let bitcoind_client = BitcoindClient::new(String::new(), "0".to_string(), String::new(), String::new());
 		let secp_ctx = Secp256k1::new();
 
@@ -265,6 +266,7 @@ impl CredentialGateway {
 			send_bitcoind_request_gateway: Mutex::new(send_bitcoind_request_gateway),
 			receive_bitcoind_result_handler: Mutex::new(receive_bitcoind_result_gateway),
 			receive_events_gateway: Mutex::new(receive_events_gateway),
+			send_validation_result_gateway: Mutex::new(send_validation_result_gateway),
 			issuance_manager: issuance_manager,
 			redemption_manager: redemption_manager,
 			sec_key: secret_key,
