@@ -411,6 +411,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 	let (send_events_gateway, receive_events_gateway) = mpsc::unbounded_channel::<ClientEvents>();
 
+	let (send_validation_result_gateway, receive_validation_result_dbrequests_manager) = mpsc::unbounded_channel::<ClientEvents>();
+
 	// The onion message handler...quite empty for now.
 	let onion_box = OnionBox::new();
 
@@ -418,10 +420,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let noise_gateway = NoiseGateway::new(gateway_receive);
 
 	// The staking credentials handler...quite empty for now.
-	let mut credential_gateway = CredentialGateway::new(receive_credential_event_gateway, send_credential_events_gateway, send_bitcoind_request_gateway, receive_bitcoind_result_handler, receive_events_gateway);
+	let mut credential_gateway = CredentialGateway::new(receive_credential_event_gateway, send_credential_events_gateway, send_bitcoind_request_gateway, receive_bitcoind_result_handler, receive_events_gateway, send_validation_result_gateway);
 
 	// The note or service provider...quite empty for now.
-	let mut note_processor = NoteProcessor::new(processor_receive_dbrequests, receive_dbrequests_manager, send_db_result_handler, config.clone());
+	let mut note_processor = NoteProcessor::new(processor_receive_dbrequests, receive_dbrequests_manager, send_db_result_handler, receive_validation_result_dbrequests_manager, config.clone());
 
 	// The service provider signer...quite empty for now.
 	let node_signer = Arc::new(NodeSigner::new());

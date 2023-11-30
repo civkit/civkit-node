@@ -43,6 +43,7 @@ pub struct NoteProcessor {
 	send_db_result_handler: TokioMutex<mpsc::UnboundedSender<ClientEvents>>,
 
 	receive_db_requests_manager: TokioMutex<mpsc::UnboundedReceiver<DbRequest>>,
+	receive_validation_dbrequests_manager: TokioMutex<mpsc::UnboundedReceiver<ClientEvents>>,
 
 	pending_write_db: HashMap<u64, Vec<(u64, Event)>>,
 
@@ -50,7 +51,7 @@ pub struct NoteProcessor {
 }
 
 impl NoteProcessor {
-	pub fn new(receive_db_requests: mpsc::UnboundedReceiver<DbRequest>, receive_db_requests_manager: mpsc::UnboundedReceiver<DbRequest>, send_db_result_handler: mpsc::UnboundedSender<ClientEvents>, our_config: Config) -> Self {
+	pub fn new(receive_db_requests: mpsc::UnboundedReceiver<DbRequest>, receive_db_requests_manager: mpsc::UnboundedReceiver<DbRequest>, send_db_result_handler: mpsc::UnboundedSender<ClientEvents>, receive_validation_dbrequests_manager: mpsc::UnboundedReceiver<ClientEvents>, our_config: Config) -> Self {
 		NoteProcessor {
 			note_counters: Mutex::new(0),
 			current_height: 0,
@@ -59,6 +60,7 @@ impl NoteProcessor {
 			send_db_result_handler: TokioMutex::new(send_db_result_handler),
 
 			receive_db_requests_manager: TokioMutex::new(receive_db_requests_manager),
+			receive_validation_dbrequests_manager: TokioMutex::new(receive_validation_dbrequests_manager),
 
 			pending_write_db: HashMap::new(),
 
@@ -112,21 +114,36 @@ impl NoteProcessor {
 				}
 			}
 
-			//TODO: once service deliverance validation is okay write events to DB.
-			//let event_id = ev.id;
-			//if is_replaceable(&ev) {
-			//	//TODO: build filter and replace event
-			//	//TODO: If two events have the same timestamp, the event with the lowest id SHOULD be retained, and the other discarded
-			//	let filter = Filter::new();
-			//	if let Ok(old_ev) = query_events_db(filter) {
-			//		//TODO: check if you should query for multiple replaced events
-			//		write_new_event_db(ev, Some(old_ev)).await;
-			//	}
-			//} else {
-			//	let ret = write_new_event_db(ev, None).await;
-			//	if ret { ok_events.push(event_id); }
-			//}
+			let mut paid_and_validated_events = Vec::new();
+			{
+				let mut receive_validation_dbrequests_manager_lock = self.receive_validation_dbrequests_manager.lock();
+				if let Ok(paid_and_validated_event) = receive_validation_dbrequests_manager_lock.await.try_recv() {
+					paid_and_validated_events.push(paid_and_validated_event);
+				}
+			}
 
+			for client_ev in paid_and_validated_events {
+				match client_ev {
+					ClientEvents::Credential { client_id, event } => {
+						//TODO: pair validation result with pending event to be written
+						//self.pending_write_db;
+						//let event_id = event.id;
+						//if is_replaceable(&event) {
+						//	//TODO: build filter and replace event
+						//	//TODO: If two events have the same timestamp, the event with the lowest id SHOULD be retained, and the other discarded
+						//	let filter = Filter::new();
+						//	if let Ok(old_ev) = query_events_db(filter) {
+						//		//TODO: check if you should query for multiple replaced events
+						//		write_new_event_db(event, Some(old_ev)).await;
+						//	}
+						//} else {
+						//	let ret = write_new_event_db(event, None).await;
+						//	if ret { ok_events.push(event_id); }
+						//}
+					},
+					_ => {},
+				}
+			}
 
 			{
 				let mut receive_db_requests_manager_lock = self.receive_db_requests_manager.lock();
