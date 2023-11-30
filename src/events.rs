@@ -33,7 +33,8 @@ pub enum ClientEvents {
 	SubscribedEvent { client_id: u64, sub_id: SubscriptionId, event: Event },
 	OkEvent { event_id: EventId, ret: bool, msg: Option<String> },
 	ServiceRegistration { pubkey: PublicKey, credential_policy: CredentialPolicy, service_policy: ServicePolicy },
-	Credential { client_id: u64, event: Event },
+	Credential { client_id: u64, deliverance_id: u64, event: Event },
+	ValidationResult { client_id: u64, deliverance_id: u64, event: Event },
 }
 
 #[derive(Debug)]
