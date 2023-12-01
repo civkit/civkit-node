@@ -163,11 +163,15 @@ impl RedemptionManager {
 
 		if service_deliverance.credentials.len() != service_deliverance.signatures.len() { return Err(RedemptionError::BadLength) }
 
+		println!("[CIVKITD] - CREDENTIAL: deliverance credentials {} signatures {}", service_deliverance.credentials.len(), service_deliverance.signatures.len());
+
 		let mut ret = false;
 		for signed_credentials in service_deliverance.credentials.iter().zip(service_deliverance.signatures.iter()) {
 			let credential_bytes = signed_credentials.0.serialize();
 			if let Ok(msg) = secp256k1::Message::from_slice(&credential_bytes[..]) {
+				//TODO: verify where the signatures are breaking at generation, client reception or constitution of deliverance message
 				ret = secp_ctx.verify_ecdsa(&msg, &signed_credentials.1, &pubkey).is_ok();
+				println!("[CIVKITD] - CREDENTIAL: ecdsa verification {}", ret);
 			} // TODO: return an error here
 		}
 
@@ -256,6 +260,12 @@ impl CredentialGateway {
 
 		let secret_key = SecretKey::new(&mut thread_rng());
 
+		let secp_ctx = Secp256k1::new();
+
+		let pubkey = PublicKey::from_secret_key(&secp_ctx, &secret_key);
+
+		println!("[CIVKITD] - CREDENTIAL: Public key {}", pubkey.to_string());
+
 		CredentialGateway {
 			bitcoind_client: bitcoind_client,
 			genesis_hash: genesis_block(Network::Testnet).header.block_hash(),
@@ -333,7 +343,7 @@ impl CredentialGateway {
 									}
 								},
 								1 => { println!("[CIVKITD] - CREDENTIAL event error: gateway should not receive CredentialAuthenticationResult"); },
-								3 => {
+								2 => {
 									match self.redemption_manager.validate_service_deliverance(client_id, deliverance_id, credential_msg_bytes, &self.sec_key) {
 										Ok(result) => {
 											println!("[CIVKITD] - CREDENTIAL: service deliverance validation result");
@@ -344,7 +354,7 @@ impl CredentialGateway {
 										}
 									}
 								},
-								4 => { println!("[CIVKITD] - CREDENTIAL event error: gateway should not receive ServiceDeliveranceResult"); },
+								3 => { println!("[CIVKITD] - CREDENTIAL event error: gateway should not receive ServiceDeliveranceResult"); },
 								_ => { println!("[CIVKITD] - CREDENTIAL: credential event error: unknown type"); }
 							}
 						} else { println!("[CIVKITD] - CREDENTIAL event error: invalid data carrier"); }
