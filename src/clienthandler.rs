@@ -313,7 +313,7 @@ impl ClientHandler {
 									}
 								}
 							},
-							ClientEvents::Credential { client_id, event } => {
+							ClientEvents::Credential { client_id, deliverance_id, event } => {
 								if client_id == map_client_id {
 									let random_sub_id = SubscriptionId::generate();
 									let relay_message = RelayMessage::new_event(random_sub_id, event.clone());
@@ -400,16 +400,17 @@ impl ClientHandler {
 								}
 								let msg_2 = msg.clone();
 								if is_credential(&msg_2) {
+									self.deliverance_counter += 1;
 									println!("[CIVKITD] - NOSTR: credential msg received");
-									let credential = ClientEvents::Credential { client_id: id, event: *msg_2.clone() };
+									let credential = ClientEvents::Credential { client_id: id, deliverance_id: self.deliverance_counter, event: *msg_2.clone() };
 									query_credential_gateway.push(credential);
 								}
 								self.filter_events(*msg).await;
 								//TODO: we should link our filtering policy to our db storing,
 								//otherwise this is a severe DoS vector
-								//TODO: move is_ephemeral check when receive result from CredentialGateway is in NoteProcessor
+								//TODO: move is_ephemeral check when receive result from CredentialGateway is in NoteProcessor ?
 								if !is_ephemeral(&msg_2) {
-									self.deliverance_counter += 1;
+									//TODO: we reuse the self.deliverance_counter
 									let db_request = DbRequest::WriteEvent { client_id: id, deliverance_id: self.deliverance_counter, ev: *msg_2 };
 									write_db.push(db_request);
 								}

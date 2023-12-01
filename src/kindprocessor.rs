@@ -98,13 +98,7 @@ impl NoteProcessor {
 				let mut receive_db_requests_lock = self.receive_db_requests.lock();
 				if let Ok(db_request) = receive_db_requests_lock.await.try_recv() {
 					match db_request {
-						DbRequest::WriteEvent { client_id, deliverance_id, ev } => {
-							if let Some(write_queue) = self.pending_write_db.get_mut(&client_id) {
-								write_queue.push((deliverance_id, ev));
-							} else {
-								self.pending_write_db.insert(client_id, vec![(deliverance_id, ev)]);
-							}
-						},
+						DbRequest::WriteEvent { client_id, deliverance_id, ev } => { self.pending_write_db.insert(client_id, vec![(deliverance_id, ev)]); },
 						DbRequest::WriteSub(ns) => { write_new_subscription_db(ns); },
 						DbRequest::WriteClient(ct) => { write_new_client_db(ct).await; },
 						DbRequest::ReplayEvents { client_id, filters } => { replay_request.push((client_id, filters)); },
@@ -124,22 +118,26 @@ impl NoteProcessor {
 
 			for client_ev in paid_and_validated_events {
 				match client_ev {
-					ClientEvents::Credential { client_id, event } => {
-						//TODO: pair validation result with pending event to be written
-						//self.pending_write_db;
-						//let event_id = event.id;
-						//if is_replaceable(&event) {
-						//	//TODO: build filter and replace event
-						//	//TODO: If two events have the same timestamp, the event with the lowest id SHOULD be retained, and the other discarded
-						//	let filter = Filter::new();
-						//	if let Ok(old_ev) = query_events_db(filter) {
-						//		//TODO: check if you should query for multiple replaced events
-						//		write_new_event_db(event, Some(old_ev)).await;
-						//	}
-						//} else {
-						//	let ret = write_new_event_db(event, None).await;
-						//	if ret { ok_events.push(event_id); }
-						//}
+					ClientEvents::ValidationResult { client_id, deliverance_id, event } => {
+						if let Some(queue_events) = self.pending_write_db.get(&client_id) {
+							for queue_event in queue_events {
+								if queue_event.0 == deliverance_id {
+									let event_id = event.id;
+									if is_replaceable(&event) {
+										//TODO: build filter and replace event
+										//TODO: If two events have the same timestamp, the event with the lowest id SHOULD be retained, and the other discarded
+										let filter = Filter::new();
+										if let Ok(old_ev) = query_events_db(filter) {
+											//TODO: check if you should query for multiple replaced events
+											write_new_event_db(event.clone(), Some(old_ev)).await;
+										}
+									} else {
+										let ret = write_new_event_db(event.clone(), None).await;
+										if ret { ok_events.push(event_id); }
+									}
+								}
+							}
+						}
 					},
 					_ => {},
 				}
