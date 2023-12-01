@@ -18,6 +18,7 @@ use bitcoin::blockdata::transaction::Transaction;
 use bitcoin::{MerkleBlock, Txid};
 use bitcoin::hashes::{Hash, sha256, HashEngine};
 use bitcoin_hashes::hex::FromHex;
+use bitcoin::secp256k1;
 
 use staking_credentials::common::utils::{Credentials, Proof};
 use staking_credentials::common::msgs::{CredentialAuthenticationPayload, CredentialAuthenticationResult, Encodable, Decodable, ServiceDeliveranceRequest, ToHex, CredentialPolicy, ServicePolicy};
@@ -41,7 +42,31 @@ use std::ops::Deref;
 
 const CLIENT_SECRET_KEY: [u8; 32] = [ 59, 148, 11, 85, 134, 130, 61, 253, 2, 174, 59, 70, 27, 180, 51, 107, 94, 203, 174, 253, 102, 39, 170, 146, 46, 252, 4, 143, 236, 12, 136, 28];
 
+// Debug purpose only
+const GATEWAY_SECRET_KEY: [u8; 32] = [ 57, 149, 12, 84, 135, 129, 62, 252, 3, 173, 60, 69, 28, 179, 52, 106, 95, 202, 175, 252, 103, 40, 169, 147, 45, 253, 5, 142, 235, 13, 135, 29];
+
 const DEFAULT_CREDENTIAL: u8 = 1;
+
+macro_rules! check_credentials_sigs_order {
+	($credentials: expr, $signatures: expr, $pubkey: expr) => {
+		{
+			let secp_ctx = Secp256k1::new();
+
+			let mut index = 0;
+	
+			for signed_credentials in $credentials.iter().zip($signatures.iter()) {
+
+				let credential_bytes = signed_credentials.0.serialize();
+
+				if let Ok(msg) = secp256k1::Message::from_slice(&credential_bytes[..]) {
+					let ret = secp_ctx.verify(&msg, &signed_credentials.1, &$pubkey);
+					assert!(ret.is_ok(), "sig check fails at {}", index);
+				}
+				index += 1;
+			}
+		}
+	}
+}
 
 struct Service {
 	pubkey: PublicKey,
@@ -113,6 +138,10 @@ impl CredentialsHolder {
 			signatures.push(self.state.1.remove(i as usize));
 		}
 		(credentials, signatures)
+	}
+
+	fn get_credentials(&mut self) -> &Vec<Credentials> {
+		&self.state.0
 	}
 }
 
@@ -311,6 +340,14 @@ fn respond(
 		}
 	    }
 
+	    #[cfg(debug_assertions)] {
+		let secp_ctx = Secp256k1::new();
+		let secret_key = SecretKey::from_slice(&GATEWAY_SECRET_KEY).unwrap();
+		let pubkey = PublicKey::from_secret_key(&secp_ctx, &secret_key);
+		check_credentials_sigs_order!(credentials, signatures, pubkey);
+		println!("DEBUG SAMPLE - signature check ok");
+	    }
+
 	    let mut service_deliverance_request = ServiceDeliveranceRequest::new(credentials, signatures, service_id);
 
 	    let mut buffer = vec![];
@@ -384,7 +421,7 @@ fn respond(
 	    let mut credentials = vec![];
 	    {
 		if let Ok(mut credential_holder_lock) = GLOBAL_HOLDER.lock() {
-			credentials = credential_holder_lock.generate_credentials(100);
+			credentials = credential_holder_lock.generate_credentials(5);
 			credential_holder_lock.store_credentials(credentials.clone());
 		}
 	    }
@@ -451,6 +488,17 @@ async fn poll_for_server_output(mut rx: futures_channel::mpsc::UnboundedReceiver
 				let credential_authentication_result = CredentialAuthenticationResult::decode(&mut credential_msg_bytes.deref()).unwrap();
 				if let Ok(mut credential_holder_lock) = GLOBAL_HOLDER.lock() {
 					println!("\n[EVENT] storing {} credential signatures from a credentail result", credential_authentication_result.signatures.len());
+				
+	    				#[cfg(debug_assertions)] {
+	    				    let secp_ctx = Secp256k1::new();
+	    				    let secret_key = SecretKey::from_slice(&GATEWAY_SECRET_KEY).unwrap();
+	    				    let pubkey = PublicKey::from_secret_key(&secp_ctx, &secret_key);
+					    let credentials = credential_holder_lock.get_credentials();
+					    println!("debug number of stored credentials {}", credentials.len());
+	    				    check_credentials_sigs_order!(credentials, credential_authentication_result.signatures, pubkey);
+	    				    println!("DEBUG SAMPLE - signature check ok");
+	    				}
+
 					credential_holder_lock.store_signatures(credential_authentication_result.signatures);	
 				}
 			    } else {

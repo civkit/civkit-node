@@ -40,6 +40,9 @@ use tokio::sync::Mutex;
 use std::collections::HashMap;
 use std::ops::Deref;
 
+// Debug purpose only
+const GATEWAY_SECRET_KEY: [u8; 32] = [ 57, 149, 12, 84, 135, 129, 62, 252, 3, 173, 60, 69, 28, 179, 52, 106, 95, 202, 175, 252, 103, 40, 169, 147, 45, 253, 5, 142, 235, 13, 135, 29];
+
 #[derive(Copy, Clone, Debug)]
 struct GatewayConfig {
 	//accepted_asset_list: AssetProofFeatures
@@ -54,6 +57,24 @@ impl Default for GatewayConfig {
 	fn default() -> GatewayConfig {
 		GatewayConfig {
 			credentials_consumed_cache_size: 10000000,
+		}
+	}
+}
+
+macro_rules! check_credentials_sigs_order {
+	($credentials: expr, $signatures: expr, $pubkey: expr) => {
+		{
+			let secp_ctx = Secp256k1::new();
+
+			for signed_credentials in $credentials.iter().zip($signatures.iter()) {
+
+				let credential_bytes = signed_credentials.0.serialize();
+
+				if let Ok(msg) = secp256k1::Message::from_slice(&credential_bytes[..]) {
+					let ret = secp_ctx.verify(&msg, &signed_credentials.1, &$pubkey);
+					assert!(ret.is_ok());
+				}
+			}
 		}
 	}
 }
@@ -115,6 +136,12 @@ impl IssuanceManager {
 				}
 			}
 
+			#[cfg(debug_assertions)] {
+				let pubkey = PublicKey::from_secret_key(&secp_ctx, &seckey);
+				check_credentials_sigs_order!(request.pending_credentials, signatures, pubkey);
+				println!("DEBUG GATEWAY- signature check ok");
+			}
+
 			let mut credential_authentication_result = CredentialAuthenticationResult::new(signatures);
 
 			let mut buffer = vec![];
@@ -161,13 +188,14 @@ impl RedemptionManager {
 			service_deliverance
 		} else { return Err(RedemptionError::Parse); };
 
+		println!("[CIVKITD] - CREDENTIAL: deliverance credentials {} signatures {}", service_deliverance.credentials.len(), service_deliverance.signatures.len());
 		if service_deliverance.credentials.len() != service_deliverance.signatures.len() { return Err(RedemptionError::BadLength) }
 
-		println!("[CIVKITD] - CREDENTIAL: deliverance credentials {} signatures {}", service_deliverance.credentials.len(), service_deliverance.signatures.len());
 
 		let mut ret = false;
 		for signed_credentials in service_deliverance.credentials.iter().zip(service_deliverance.signatures.iter()) {
 			let credential_bytes = signed_credentials.0.serialize();
+
 			if let Ok(msg) = secp256k1::Message::from_slice(&credential_bytes[..]) {
 				//TODO: verify where the signatures are breaking at generation, client reception or constitution of deliverance message
 				ret = secp_ctx.verify_ecdsa(&msg, &signed_credentials.1, &pubkey).is_ok();
@@ -242,6 +270,7 @@ impl CredentialGateway {
 		let asset_proof_features = AssetProofFeatures::new(vec![]);
 		let credentials_features = CredentialsFeatures::new(vec![]);
 
+		//TODO: encapsulate gateway key in issue state ?
 		let issuer_state = IssuerState::new(asset_proof_features, credentials_features, pubkey);
 
 		let issuance_manager = IssuanceManager {
@@ -253,12 +282,16 @@ impl CredentialGateway {
 		let redemption_engine = RedemptionEngine::new();
 
 		let redemption_manager = RedemptionManager {
-			redemption_engine,	
+			redemption_engine,
 		};
 
 		let hosted_services = HashMap::new();
 
-		let secret_key = SecretKey::new(&mut thread_rng());
+		let mut secret_key = SecretKey::new(&mut thread_rng());
+
+		#[cfg(debug_assertions)] {
+			secret_key = SecretKey::from_slice(&GATEWAY_SECRET_KEY).unwrap();
+		}
 
 		let secp_ctx = Secp256k1::new();
 
