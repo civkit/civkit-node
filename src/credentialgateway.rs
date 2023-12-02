@@ -178,7 +178,7 @@ struct RedemptionManager {
 }
 
 impl RedemptionManager {
-	fn validate_service_deliverance(&mut self, client_id: u64, deliverance_id: u64, credential_msg_bytes: Vec<u8>, secret_key: &SecretKey) -> Result<(u64, Event), RedemptionError> {
+	fn validate_service_deliverance(&mut self, client_id: u64, deliverance_id: u64, credential_msg_bytes: Vec<u8>, secret_key: &SecretKey) -> Result<(bool, u64, Event), RedemptionError> {
 
 		let secp_ctx = Secp256k1::new();
 
@@ -203,8 +203,7 @@ impl RedemptionManager {
 			} // TODO: return an error here
 		}
 
-		let service_id = 0;
-		let ret = false;
+		let service_id = service_deliverance.service_id;
 
 		let mut service_deliverance_result = ServiceDeliveranceResult::new(service_id, ret);
 
@@ -218,7 +217,7 @@ impl RedemptionManager {
 		let server_event_keys = Keys::generate();
 
 		if let Ok(credential_carrier) = EventBuilder::new_text_note("", tags).to_event(&server_event_keys) {
-			return Ok((deliverance_id, credential_carrier));
+			return Ok((ret, deliverance_id, credential_carrier));
 		}
 		Err(RedemptionError::EventGenerationError)
 	}
@@ -380,7 +379,10 @@ impl CredentialGateway {
 									match self.redemption_manager.validate_service_deliverance(client_id, deliverance_id, credential_msg_bytes, &self.sec_key) {
 										Ok(result) => {
 											println!("[CIVKITD] - CREDENTIAL: service deliverance validation result");
-											redemption_result.push((client_id, result));
+											//TODO: return ServiceDeliveranceResult to original client.
+											if result.0 {
+												redemption_result.push((client_id, (result.1, result.2)));
+											}
 										},
 										Err(error) => {
 											println!("[CIVKITD - CREDENTIAL: authentication request error {:?}", error);
@@ -432,6 +434,7 @@ impl CredentialGateway {
 
 			{
 				for (client_id, result) in redemption_result {
+					println!("[CIVKITD] - CREDENTIAL: forward validation result for DB write");
 					let mut send_validation_result_gateway_lock = self.send_validation_result_gateway.lock();
 					send_validation_result_gateway_lock.await.send(ClientEvents::Credential { client_id, deliverance_id: result.0, event: result.1 });
 				}

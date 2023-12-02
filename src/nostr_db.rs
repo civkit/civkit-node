@@ -153,30 +153,31 @@ pub fn query_events_db(filter: Filter) -> Result<Vec<Event>, ()> {
 		if let Some(kinds) = filter.kinds {
 			//TODO: iter on all the kinds provided by the filter
 			let sql = format!("SELECT event_id, sha256, pubkey, timestamp, kind, content, cumulative_hash FROM event WHERE kind = {}", kinds[0].as_u32());
-			let mut stmt = conn.prepare(&sql).unwrap();
-			let event_iter = stmt.query_map([], |row| {
-				Ok(DbEvent {
-					id: row.get(0)?,
-					sha256: row.get(1)?,
-					pubkey: row.get(2)?,
-					timestamp: row.get(3)?,
-					kind: row.get(4)?,
-					content: row.get(5)?,
-					cumulative_hash: row.get(6)?,
-				})
-			}).unwrap();
+			if let Ok(mut stmt) = conn.prepare(&sql) {
+				let event_iter = stmt.query_map([], |row| {
+					Ok(DbEvent {
+						id: row.get(0)?,
+						sha256: row.get(1)?,
+						pubkey: row.get(2)?,
+						timestamp: row.get(3)?,
+						kind: row.get(4)?,
+						content: row.get(5)?,
+						cumulative_hash: row.get(6)?,
+					})
+				}).unwrap();
 
-			let mut result_events = Vec::new();
+				let mut result_events = Vec::new();
 
-			//TODO: write keys on DB
-			let dummy_keys = Keys::generate();
-			for event in event_iter {
-				let db_event = event.unwrap();
-				let e = EventBuilder::new(Kind::from(db_event.kind as u64), db_event.content.unwrap(), &[]).to_event(&dummy_keys).unwrap();
-				result_events.push(e);
-			}
+				//TODO: write keys on DB
+				let dummy_keys = Keys::generate();
+				for event in event_iter {
+					let db_event = event.unwrap();
+					let e = EventBuilder::new(Kind::from(db_event.kind as u64), db_event.content.unwrap(), &[]).to_event(&dummy_keys).unwrap();
+					result_events.push(e);
+				}
 
-			return Ok(result_events);
+				return Ok(result_events);
+			} else { return Err(()) }
 		}
 	}
 
