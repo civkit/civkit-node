@@ -90,15 +90,16 @@ impl NoteProcessor {
 		loop {
 			sleep(Duration::from_millis(1000)).await;
 
-			//TODO: wait for the ServiceDeliveranceResult of the CredentialGateway before to trigger write_new_event_db.
-
 			let mut replay_request = Vec::new();
 			let mut ok_events = Vec::new();
 			{
 				let mut receive_db_requests_lock = self.receive_db_requests.lock();
 				if let Ok(db_request) = receive_db_requests_lock.await.try_recv() {
 					match db_request {
-						DbRequest::WriteEvent { client_id, deliverance_id, ev } => { self.pending_write_db.insert(client_id, vec![(deliverance_id, ev)]); },
+						DbRequest::WriteEvent { client_id, deliverance_id, ev } => {
+							println!("[CIVKITD] - NOTE PROCESSING: Stagging event for validation");
+							self.pending_write_db.insert(client_id, vec![(deliverance_id, ev)]);
+						},
 						DbRequest::WriteSub(ns) => { write_new_subscription_db(ns); },
 						DbRequest::WriteClient(ct) => { write_new_client_db(ct).await; },
 						DbRequest::ReplayEvents { client_id, filters } => { replay_request.push((client_id, filters)); },
@@ -112,18 +113,19 @@ impl NoteProcessor {
 			{
 				let mut receive_validation_dbrequests_manager_lock = self.receive_validation_dbrequests_manager.lock();
 				if let Ok(paid_and_validated_event) = receive_validation_dbrequests_manager_lock.await.try_recv() {
+					println!("[CIVKITD] - NOTE PROCESSING: Note processor paid and validated events");
 					paid_and_validated_events.push(paid_and_validated_event);
 				}
 			}
 
 			for client_ev in paid_and_validated_events {
 				match client_ev {
-					ClientEvents::ValidationResult { client_id, deliverance_id, event } => {
+					ClientEvents::Credential { client_id, deliverance_id, event } => {
 						if let Some(queue_events) = self.pending_write_db.get(&client_id) {
 							for queue_event in queue_events {
 								if queue_event.0 == deliverance_id {
-									let event_id = event.id;
-									if is_replaceable(&event) {
+									let event_id = queue_event.1.id;
+									if is_replaceable(&queue_event.1) {
 										//TODO: build filter and replace event
 										//TODO: If two events have the same timestamp, the event with the lowest id SHOULD be retained, and the other discarded
 										let filter = Filter::new();
@@ -132,8 +134,9 @@ impl NoteProcessor {
 											write_new_event_db(event.clone(), Some(old_ev)).await;
 										}
 									} else {
-										let ret = write_new_event_db(event.clone(), None).await;
-										if ret { ok_events.push(event_id); }
+										let ret = write_new_event_db(queue_event.1.clone(), None).await;
+										println!("[CIVKITD] NOTE PROCESSING: Note stored on disk");
+										if ret { ok_events.push((client_id, queue_event.1.id)); }
 									}
 								}
 							}
@@ -172,9 +175,15 @@ impl NoteProcessor {
 				send_db_result_handler_lock.await.send(stored_event);
 			}
 
-			for ev in ok_events {
+			let ok_event_mainstay = ok_events.clone();
+			for (client_id, ev) in ok_events {
+				println!("[CIVKITD] - NOTE PROCESSING: Note processor flushing events");
 				let mut send_db_result_handler_lock = self.send_db_result_handler.lock();
-				let ok_event = ClientEvents::OkEvent { event_id: ev, ret: true, msg: None };
+				let ok_event = ClientEvents::OkEvent { client_id: client_id, event_id: ev, ret: true, msg: None };
+				send_db_result_handler_lock.await.send(ok_event);
+			}
+
+			for (_, ev) in ok_event_mainstay {
 				let event_id = ev.to_string();
 				let commitment = encode(get_cumulative_hash_of_last_event().await.unwrap());
 				let position = self.config.mainstay.position;

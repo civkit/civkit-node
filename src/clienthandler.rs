@@ -13,7 +13,7 @@ use bitcoin::secp256k1;
 use bitcoin::secp256k1::SecretKey;
 use bitcoin::secp256k1::Secp256k1;
 
-use nostr::{RelayMessage, Event, ClientMessage, SubscriptionId, Filter};
+use nostr::{RelayMessage, Event, EventId, ClientMessage, SubscriptionId, Filter};
 use nostr::key::XOnlyPublicKey;
 
 use crate::config::Config;
@@ -74,6 +74,9 @@ pub struct ClientHandler {
 	receive_credential_events_handler: Mutex<mpsc::UnboundedReceiver<ClientEvents>>,
 
 	filtered_events: HashMap<SubscriptionId, Event>,
+
+	//TODO: put a max limit per client on the incoming event buffer.
+	pending_validation_events: Mutex<HashMap<EventId, ClientEvents>>,
 
 	pending_events: Mutex<Vec<ClientEvents>>,
 
@@ -149,6 +152,8 @@ impl ClientHandler {
 
 			filtered_events: HashMap::new(),
 
+			pending_validation_events: Mutex::new(HashMap::new()),
+
 			pending_events: Mutex::new(vec![]),
 
 			deliverance_counter: 0,
@@ -209,6 +214,7 @@ impl ClientHandler {
 				}
 			}
 
+			let mut mark_as_validated = Vec::new();
 			for event in client_events {
 				let mut map_send_lock = self.map_send.lock();
 
@@ -264,10 +270,14 @@ impl ClientHandler {
 								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending end of stored events"); },
 							}
 						},
-						ClientEvents::OkEvent { ref event_id, ref ret, ref msg } => {
+						ClientEvents::OkEvent { ref client_id, ref event_id, ref ret, ref msg } => {
+							if id != client_id { continue }
+
 							let msg_str = if msg.is_none() { String::new() } else { msg.clone().unwrap() };
+							let event_id_2 = event_id.clone();
 							let relay_message = RelayMessage::new_ok(*event_id, *ret, msg_str);
 							let serialized_message = relay_message.as_json();
+							mark_as_validated.push(event_id_2);
 							match outgoing_send.send(serialized_message.into_bytes()) {
 								Ok(_) => {},
 								Err(_) => { println!("[CIVKITD] - NOSTR: Error inter thread sending ok event"); },
@@ -283,8 +293,15 @@ impl ClientHandler {
 
 			{
 
-				let mut pending_events_lock = self.pending_events.lock().await;
-				dispatch_events.append(&mut pending_events_lock);
+				let mut pending_validation_events_lock = self.pending_validation_events.lock().await;
+				if pending_validation_events_lock.len() != 0 { println!("[CIVKITD] NOSTR: - Pending validation events {} and validated events {}", pending_validation_events_lock.len(), mark_as_validated.len()); }
+				for validated in mark_as_validated {
+					println!("[CIVKITD] NOSTR: Validated Event Id {}", validated.to_string());
+					if let Some(event) = pending_validation_events_lock.remove(&validated) {
+						println!("[CIVKITD] - NOSTR: Dispatching validated event");
+						dispatch_events.push(event);
+					}
+				}
 			}
 
 			// Dispatch pending client events
@@ -404,15 +421,15 @@ impl ClientHandler {
 									println!("[CIVKITD] - NOSTR: credential msg received");
 									let credential = ClientEvents::Credential { client_id: id, deliverance_id: self.deliverance_counter, event: *msg_2.clone() };
 									query_credential_gateway.push(credential);
-								}
-								self.filter_events(*msg).await;
-								//TODO: we should link our filtering policy to our db storing,
-								//otherwise this is a severe DoS vector
-								//TODO: move is_ephemeral check when receive result from CredentialGateway is in NoteProcessor ?
-								if !is_ephemeral(&msg_2) {
-									//TODO: we reuse the self.deliverance_counter
-									let db_request = DbRequest::WriteEvent { client_id: id, deliverance_id: self.deliverance_counter, ev: *msg_2 };
-									write_db.push(db_request);
+								} else {
+									//TODO: move filtering logic in its own thread - beware out of sync with credential validation due to event timing.
+									self.filter_events(*msg).await;
+									//TODO: move is_ephemeral check when receive result from CredentialGateway is in NoteProcessor ?
+									if !is_ephemeral(&msg_2) {
+										//TODO: we reuse the self.deliverance_counter
+										let db_request = DbRequest::WriteEvent { client_id: id, deliverance_id: self.deliverance_counter, ev: *msg_2 };
+										write_db.push(db_request);
+									}
 								}
 							},
 							ClientMessage::Req { subscription_id, filters } => {
@@ -424,6 +441,16 @@ impl ClientHandler {
 									// Sanitize with keys ?
 									if !nostr_client.add_sub(our_side_id, MAX_SUBSCRIPTIONS) {
 										println!("[CIVKITD] - NOSTR: subscription register failure");
+									}
+								}
+
+								#[cfg(debug_assertions)] {
+									for filter in &filters {
+										if let Some(kinds) = &filter.kinds {
+											for kind in kinds {
+												 println!("[CIVKITD - NOSTR: Registering subscription for kind {}", kind.as_u32());
+											}
+										}
 									}
 								}
 								let nostr_sub = NostrSub::new(our_side_id, subscription_id.clone(), filters.clone());
@@ -475,32 +502,38 @@ impl ClientHandler {
 
 	async fn filter_events(&mut self, event: Event) -> bool {
 
+		println!("[CIVKITD] - NOSTR: Apply filtering of the event on {} subscriptions with event kind {}", self.subscriptions.len(), event.kind.as_u32());
 		let mut match_result = false;
 		for (our_side_id, sub) in self.subscriptions.iter() {
 			let filters = sub.get_filters();
 			for filter in filters {
 				if let Some(ref kinds) = filter.kinds {
 					for kind in kinds.iter() {
-						if kind == &event.kind {
+						if kind.as_u32() == event.kind.as_u32() {
 							match_result = true;
 						}
 					}
 				}
 			}
+			println!("[CIVKITD] - NOSTR: Matching result {}", match_result);
 			let mut clients_to_dispatch = Vec::new();
 			if match_result {
 				for (client_id, nostr_client) in self.clients.iter() {
 					if nostr_client.has_sub(*our_side_id) {
 						//TODO: fulfill with match subscription
+						let event_id = event.id.clone();
 						let associated_event = ClientEvents::SubscribedEvent { client_id: client_id.clone(), sub_id: SubscriptionId::generate(), event: event.clone() };
-						clients_to_dispatch.push(associated_event);
+						clients_to_dispatch.push((event_id, associated_event));
 					}
 				}
 			}
 
 			{
-				let mut pending_events_lock = self.pending_events.lock();
-				pending_events_lock.await.append(&mut clients_to_dispatch);
+				let mut pending_validation_events_lock = self.pending_validation_events.lock().await;
+				for ev in clients_to_dispatch {
+					println!("[CIVKITD] - NOSTR: Witholding one event {} pending validation", event.id.to_hex());
+					pending_validation_events_lock.insert(ev.0, ev.1);
+				}
 			}
 		}
 
