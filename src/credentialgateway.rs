@@ -425,8 +425,8 @@ impl CredentialGateway {
 
 			let services_to_be_announced = self.get_new_service_announcement(0); //TODO: put this on a timer and filter what is already announced ?
 			{
-				let mut send_credential_lock = self.send_credential_events_gateway.lock();
 				for service in services_to_be_announced {
+					let mut send_credential_lock = self.send_credential_events_gateway.lock();
 					send_credential_lock.await.send(ClientEvents::ServiceAnnouncement { credential_policy: service.credential_policy, service_policy: service.service_policy });
 				}
 			}
