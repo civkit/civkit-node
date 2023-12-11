@@ -35,6 +35,7 @@ pub enum ClientEvents {
 	ServiceRegistration { pubkey: PublicKey, credential_policy: CredentialPolicy, service_policy: ServicePolicy },
 	Credential { client_id: u64, deliverance_id: u64, event: Event },
 	ValidationResult { client_id: u64, deliverance_id: u64, event: Event },
+	ServiceAnnouncement { credential_policy: CredentialPolicy, service_policy: ServicePolicy },
 }
 
 #[derive(Debug)]

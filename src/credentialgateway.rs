@@ -329,7 +329,7 @@ impl CredentialGateway {
 		Ok((credential_msg_bytes[0], credential_msg_bytes))
 	}
 
-	fn announce_new_service(&self, since: u64) -> Vec<Service> {
+	fn get_new_service_announcement(&self, since: u64) -> Vec<Service> {
 		let mut to_be_announced_services = Vec::new();
 
 		for (_, service) in self.hosted_services.iter() {
@@ -459,7 +459,13 @@ impl CredentialGateway {
 				}
 			}
 
-			//TODO: announce back new policy to the clients
+			let services_to_be_announced = self.get_new_service_announcement(0); //TODO: put this on a timer and filter what is already announced ?
+			{
+				for service in services_to_be_announced {
+					let mut send_credential_lock = self.send_credential_events_gateway.lock();
+					send_credential_lock.await.send(ClientEvents::ServiceAnnouncement { credential_policy: service.credential_policy, service_policy: service.service_policy });
+				}
+			}
 		}
 	}
 }
