@@ -113,3 +113,4 @@ pub mod mainstay;
 pub mod inclusionproof;
 pub mod verifycommitment;
 pub mod rpcclient;
+pub mod verifycommitment_test;
