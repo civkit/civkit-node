@@ -169,4 +169,37 @@ Civkit sample startup successful. Enter "help" to view available commands
 Being Paid to host Market orders
 --------------------------------
 
-TODO: explain the Credential framework
+The Civkit Node relay is powered by the Staking Credential framework, a cryptographic
+protocol that allows users to receive an amount of anonymous credentials in exchange
+of paying an on-chain payment (off-chain payment to come). Those anonymous credentials
+can be used at a later time to redeem services.
+
+Currently, the services that can be redeemed are market order posting and relaying to
+the connected Clients, assuming they have opened a subscription.
+
+The integration with Bitcoin Core wallet for automatic workflow is work-in-progress.
+
+For now, a Civkit Node operator can issue on-chain address manually with the following
+commands: `ADDR=`bitcoin-cli getnewaddress``
+
+This address $ADDR can be communicated out of band to the Civkit clients.
+
+Once the address is paid and the transaction has been included in the chain, the Civkit
+client can generate a transaction proof from the txid (the $TXID). Bitcoin Core with the
+following command `PROOF=gettxoutproof "[\"$TXID\"]"`.
+
+As of today, there is no cryptographic binding between the paid address and the proof,
+so the address should be kept confidential between the Civkit Node and the Civkit client.
+
+(See https://github.com/civkit/staking-credentials-spec/issues/6)
+
+The proof can be communicated by the Civkit client with the command `submitcredentialproof
+$PROOF`. Signed credentials should be automatically signed by the Civkit Node server
+and share back to the Client. Those credentials are cached by the Client.
+
+Once the credential exchange step is done, `sendmarketorder` can be send by Civkit client
+to post market order and get them relayed over all Civkit clients, which have subscribed
+to nostr event `32500`.
+
+Standard documentation on how to use Bitcoin Core and its wallet is available at:
+https://github.com/bitcoin/bitcoin/tree/master/doc
