@@ -61,6 +61,7 @@ use tokio::sync::{oneshot, mpsc};
 use tokio_tungstenite::WebSocketStream;
 
 use tonic::{transport::Server, Request, Response, Status};
+use serde_json::Value;
 
 //TODO: rename boarctrl to something like relayctrl ?
 pub mod adminctrl {
@@ -441,7 +442,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let service_manager_arc = Arc::new(ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, manager_send_bitcoind_request, send_events_gateway, config.clone()));
 
 	// We initialize the inclusion proof with txid, commitment and merkle proof as empty strings.
-	let mut inclusion_proof = InclusionProof::new("".to_string(), "".to_string(), "".to_string(), Vec::new(), config.clone());
+	let mut inclusion_proof = InclusionProof::new("".to_string(), "".to_string(), "".to_string(), Vec::new(), "".to_string(), Value::Null, config.clone());
 
 	let addr = format!("[::1]:{}", cli.cli_port).parse()?;
 
