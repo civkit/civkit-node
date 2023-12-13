@@ -43,6 +43,8 @@ use adminctrl::admin_ctrl_server::{AdminCtrl, AdminCtrlServer};
 
 use crate::civkitservice::civkit_service_server::{CivkitService, CivkitServiceServer};
 
+use crate::civkitservice::civkit_service_client::CivkitServiceClient;
+
 use clap::Parser;
 
 use nostr::{Keys, EventBuilder};
@@ -52,6 +54,7 @@ use std::net::SocketAddr;
 use std::process;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
@@ -330,6 +333,20 @@ impl CivkitService for std::sync::Arc<ServiceManager> {
 
 		Ok(Response::new(civkitservice::SubmitReply {}))
 	}
+
+	async fn verify_inclusion_proof(&self, request: Request<civkitservice::VerifyInclusionProofRequest>) -> Result<Response<civkitservice::VerifyInclusionProofReply>, Status> {
+		
+		println!("[CIVKITD] - CONTROL: verify inclusion proof !");
+
+		let (send, recv) = oneshot::channel::<Option<String>>();
+		{
+			let mut send_bitcoind_request_lock = self.send_bitcoind_request.lock().unwrap();
+			send_bitcoind_request_lock.send(BitcoindRequest::VerifyInclusionProof { inclusion_proof: (*self.inclusion_proof).clone(), respond_to: send });
+		}
+		if let Some(response) = recv.await.expect("BitcoindHandler has been killed") {
+			Ok(Response::new(civkitservice::VerifyInclusionProofReply { verified: response } ))
+		} else { Ok(Response::new(civkitservice::VerifyInclusionProofReply { verified: false.to_string() })) }
+	}
 }
 
 #[derive(Parser, Debug)]
@@ -438,11 +455,11 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 	let mut bitcoind_handler = BitcoindHandler::new(config.clone(), receive_bitcoind_request, receive_bitcoind_request_handler, send_bitcoind_result_gateway);
 
-	// Main handler of services provision.
-	let service_manager_arc = Arc::new(ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, manager_send_bitcoind_request, send_events_gateway, config.clone()));
-
 	// We initialize the inclusion proof with txid, commitment and merkle proof as empty strings.
 	let mut inclusion_proof = InclusionProof::new("".to_string(), "".to_string(), "".to_string(), Vec::new(), "".to_string(), Value::Null, config.clone());
+
+	// Main handler of services provision.
+	let service_manager_arc = Arc::new(ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, manager_send_bitcoind_request, send_events_gateway, Arc::new(inclusion_proof.clone()), config.clone()));
 
 	let addr = format!("[::1]:{}", cli.cli_port).parse()?;
 

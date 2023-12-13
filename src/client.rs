@@ -83,7 +83,7 @@ enum Command {
 	/// Generate a merkle block (header + merkle branch) for the target txid
 	GenerateTxInclusionProof {
 		txid: String,
-	}
+	},
 }
 
 #[tokio::main]

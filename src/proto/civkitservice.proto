@@ -7,6 +7,7 @@ service CivkitService {
 	rpc RegisterService(RegisterRequest) returns (RegisterReply);
 	rpc FetchServiceEvent(FetchRequest) returns (FetchReply);
 	rpc SubmitServiceEvent(SubmitRequest) returns (SubmitReply);
+	rpc VerifyInclusionProof (VerifyInclusionProofRequest) returns (VerifyInclusionProofReply);
 }
 
 message RegisterRequest {
@@ -29,4 +30,11 @@ message SubmitRequest {
 }
 
 message SubmitReply {
+}
+
+message VerifyInclusionProofRequest {
+}
+
+message VerifyInclusionProofReply {
+	string verified = 1;
 }
