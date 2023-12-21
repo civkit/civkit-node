@@ -21,6 +21,7 @@ The sample can send the following requests to the relay:
 - `opensubscription subscriptionid kinds since until`: open a subscription to the relay
 - `closesubscription subscriptionid`: close a subscription to the relay
 - `submitcredentialproof merkle_block`: submit a staking credential proof to the relay
+- `verifyinclusionproof`: verify the inclusion proof
 
 The `civkit-cli` can send the following commands to the relay:
 - `ping`: send a ping message
