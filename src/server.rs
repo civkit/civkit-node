@@ -361,10 +361,10 @@ struct Cli {
 	#[clap(short, long, default_value = "50031")]
 	cli_port: String,
 }
-
-fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+#[tokio::main]
+async fn main() {
     let data_dir = util::get_default_data_dir();
-	fs::create_dir_all(get_default_data_dir())?;
+	fs::create_dir_all(get_default_data_dir()).unwrap();
 	let config_path = data_dir.join("config.toml");
 	// Check if the config file exists
     if !config_path.exists() {
@@ -379,7 +379,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let contents = fs::read_to_string(&config_path).expect("could not read config file");
     let config : Config = toml::from_str(&contents).expect("Could not deserialize the config file content");
     // Initialize the logger with the level from the config
-    util::init_logger(&data_dir, &config.logging.level)?;
+    util::init_logger(&data_dir, &config.logging.level).unwrap();
 
     log::info!("Logging initialized. Log file located at: {:?}", data_dir.join("debug.log"));
 
@@ -398,7 +398,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 	println!("[CIVKITD] - INIT: noise port {} nostr port {} cli_port {}", cli.noise_port, cli.nostr_port, cli.cli_port);
 
-	let rt = Runtime::new()?;
 
 	// We initialize the communication channels between the service manager and ClientHandler.
 	let (service_mngr_events_send, handler_receive) = mpsc::unbounded_channel::<ClientEvents>();
@@ -461,7 +460,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	// Main handler of services provision.
 	let service_manager_arc = Arc::new(ServiceManager::new(node_signer, anchor_manager, service_mngr_events_send, service_mngr_peer_send, manager_send_dbrequests, manager_send_bitcoind_request, send_events_gateway, Arc::new(inclusion_proof.clone()), config.clone()));
 
-	let addr = format!("[::1]:{}", cli.cli_port).parse()?;
+	let addr = format!("[::1]:{}", cli.cli_port).parse().expect("Failed to parse address, port might be invalid?");
 
 	let service_mngr_svc = Server::builder()
 		.add_service(AdminCtrlServer::new(service_manager_arc.clone()))
@@ -471,8 +470,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	let peer_manager = noise_gateway.peer_manager.clone();
 	let stop_listen_connect = Arc::new(AtomicBool::new(false));
 	let stop_listen = Arc::clone(&stop_listen_connect);
-
-	rt.block_on(async {
 
 	// We start the gRPC server for `civkit-cli`.
     	tokio::spawn(async move {
@@ -537,7 +534,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	});
 
 	// We start the tcp listener for NIP-01 clients.
-	tokio::spawn(async move {
+	let handle = tokio::spawn(async move {
 		let try_socket = TcpListener::bind(format!("[::1]:{}", cli.nostr_port)).await;
 		let listener = try_socket.expect("Failed to bind");
 
@@ -549,10 +546,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	});
 
 
-	loop {}
+	handle.await; //TEMPORARY SOLUTION should use ALL handles or block indefinetely TODO
 
-	});
-
-    	Ok(())
 }
 
