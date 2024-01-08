@@ -1,11 +1,14 @@
 #!/bin/bash
 
-# Define the path to the config file
-CONFIG_FILE="./example-config.toml"
+# might be outdated as we generate a default config.toml on first start
 
+# Define the path to the config file
+CONFIG_FILE="./config.toml"
+
+# TODO does not match Config::default()
 # Check if the file exists
 if [[ ! -f $CONFIG_FILE ]]; then
-    echo "example-config.toml not found. Creating a default one..."
+    echo "config.toml not found. Creating a default one..."
 
     # Define the default content for the config file
     config_content='[performance]
@@ -30,5 +33,5 @@ level = "info"'
     # Write the default content to the config file
     echo "$config_content" > $CONFIG_FILE
 else
-    echo "example-config.toml already exists."
+    echo "config.toml already exists."
 fi

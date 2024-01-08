@@ -365,7 +365,7 @@ struct Cli {
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let data_dir = util::get_default_data_dir();
 
-	let config_path = data_dir.join("example-config.toml");
+	let config_path = data_dir.join("config.toml");
 
     // Read the configuration file
     let contents = fs::read_to_string(&config_path);
