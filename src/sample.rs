@@ -483,7 +483,7 @@ async fn respond(
     }
         _ => {
             println!("Unknown command");
-            return Ok(true);
+            return Ok(false);
         }
     }
 
