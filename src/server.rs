@@ -15,7 +15,7 @@ mod util;
 
 use bitcoin::MerkleBlock;
 
-use crate::util::init_logger;
+use crate::util::{init_logger, get_default_data_dir};
 use log;
 use std::fs;
 use crate::servicemanager::ServiceManager;
@@ -364,20 +364,20 @@ struct Cli {
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let data_dir = util::get_default_data_dir();
-
+	fs::create_dir_all(get_default_data_dir())?;
 	let config_path = data_dir.join("config.toml");
+	// Check if the config file exists
+    if !config_path.exists() {
+        // Create a file with the default configuration
+        let default_config = Config::default();
+        let toml_string = toml::to_string(&default_config).expect("Failed to serialize default config");
 
+        fs::write(&config_path, toml_string).expect("Failed to write default config file");
+        println!("Created default config file at {:?}", config_path);
+    }
     // Read the configuration file
-    let contents = fs::read_to_string(&config_path);
-    let config = match contents {
-        Ok(data) => {
-            toml::from_str(&data).expect("Could not deserialize the config file content")
-        },
-        Err(_) => {
-            // If there's an error reading the file, use the default configuration
-            Config::default()
-        }
-    };
+    let contents = fs::read_to_string(&config_path).expect("could not read config file");
+    let config : Config = toml::from_str(&contents).expect("Could not deserialize the config file content");
     // Initialize the logger with the level from the config
     util::init_logger(&data_dir, &config.logging.level)?;
 
