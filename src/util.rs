@@ -33,13 +33,11 @@ pub fn get_default_data_dir() -> PathBuf {
     platform_path
 }
 
-// Function to initialize the logger with the given data directory
-pub fn init_logger(data_dir: &PathBuf, log_level: &str ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    
+pub fn init_logger(data_dir: &PathBuf, log_level: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
     if !data_dir.exists() {
         fs::create_dir_all(data_dir)?;
     }
-    
+
     let log_file = data_dir.join("debug.log");
     let config = ConfigBuilder::new().build();
     let level_filter = match log_level {
@@ -48,14 +46,21 @@ pub fn init_logger(data_dir: &PathBuf, log_level: &str ) -> Result<(), Box<dyn E
         "info" => LevelFilter::Info,
         "debug" => LevelFilter::Debug,
         "trace" => LevelFilter::Trace,
-        _ => panic!("Invalid log level in config"),
+        _ => return Err("Invalid log level in config".into()),
     };
 
     let log_writer = File::create(&log_file)?;
     let file_logger = WriteLogger::new(level_filter, config.clone(), log_writer);
-    let term_logger = TermLogger::new(level_filter, config, TerminalMode::Mixed).unwrap();
 
-    CombinedLogger::init(vec![file_logger, term_logger])
+    let mut loggers: Vec<Box<dyn simplelog::SharedLogger>> = vec![file_logger];
+
+    // Attempt to initialize terminal logger
+    match TermLogger::new(level_filter, config, TerminalMode::Mixed) {
+        Some(term_logger) => loggers.push(term_logger),
+        None => eprintln!("Warning: Terminal logging is not available."),
+    }
+
+    CombinedLogger::init(loggers)
         .map_err(|err| Box::new(err) as Box<dyn Error + Send + Sync>)
 }
 
