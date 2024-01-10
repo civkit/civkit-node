@@ -99,9 +99,9 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, outgoing_rec
 				Ok(Message::Text(msg)) => { outgoing_receive.send(msg.into()); },
 				Ok(Message::Binary(msg)) => { outgoing_receive.send(msg); },
 				Ok(Message::Close(None)) => { break; },
-				_ => {
+				other => {
 					//TODO: if failure client state cleanly
-					panic!("[CIVKITD] - NOSTR: unknown webSocket message ?!"); 
+					println!("[CIVKITD] unknow message: {:?}", Some(other));
 				},
 			}
 		}
@@ -170,7 +170,7 @@ impl ClientHandler {
 			{
 				// We receive an offer processed by the relay management utility, or any other
 				// service-side Nostr event.
-				let mut handler_receive_lock = self.handler_receive.lock();
+				let handler_receive_lock = self.handler_receive.lock();
 
 				if let Ok(event) = handler_receive_lock.await.try_recv() {
 					println!("[CIVKITD] - PROCESSING: received an event from service manager");

@@ -1,8 +1,11 @@
 use std::fs;
+use bitcoin::{Block, BlockHeader, Network};
+use serde::Serializer;
 use toml;
-use serde_derive::Deserialize;
+use serde_derive::{Deserialize, Serialize};
 
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct Config {
     pub performance: Performance,
     pub spam_protection: SpamProtection,
@@ -13,23 +16,23 @@ pub struct Config {
     pub bitcoind_params: BitcoindParams,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct Performance {
     pub max_db_size: i32,
     pub max_event_age: i32,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct SpamProtection {
     pub requestcredentials: bool,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct Connections {
     pub maxclientconnections: i32,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct Civkitd {
     pub network: String,
     pub noise_port: i32,
@@ -37,12 +40,12 @@ pub struct Civkitd {
     pub cli_port: i32,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct Logging {
     pub level: String,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct Mainstay {
 	pub url: String,
 	pub position: i32,
@@ -51,12 +54,13 @@ pub struct Mainstay {
 	pub chain_code: String,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct BitcoindParams {
 	pub host: String,
 	pub port: String,
 	pub rpc_user: String,
 	pub rpc_password: String,
+    pub chain: bitcoin::Network,
 }
 
 // default config to fallback
@@ -94,6 +98,7 @@ impl Default for Config {
 		port: "18443".to_string(), // regtest
 		rpc_user: "civkitd_client".to_string(),
 		rpc_password: "hello_world".to_string(),
+        chain: bitcoin::Network::Testnet,
 	    }
         }
     }

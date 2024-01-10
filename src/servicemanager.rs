@@ -64,7 +64,7 @@ impl ServiceManager
 		let secp_ctx = Secp256k1::new();
 		let pubkey = PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[42;32]).unwrap());
 		ServiceManager {
-			genesis_hash: genesis_block(Network::Testnet).header.block_hash(),
+			genesis_hash: genesis_block(our_config.bitcoind_params.chain).header.block_hash(),
 			anchor_manager,
 			node_signer,
 			service_events_send: Mutex::new(board_events_send),

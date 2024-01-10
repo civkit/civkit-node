@@ -483,7 +483,7 @@ async fn respond(
     }
         _ => {
             println!("Unknown command");
-            return Ok(true);
+            return Ok(false);
         }
     }
 
@@ -493,10 +493,10 @@ async fn respond(
 async fn poll_for_server_output(mut rx: futures_channel::mpsc::UnboundedReceiver<Message>) {
 
     loop {
-        if let Ok(message) = rx.try_next() {
+        if let message = rx.next().await {
 			let msg = message.unwrap();
                 let msg_json = String::from_utf8(msg.into()).unwrap();
-                //println!("Received message {}", msg_json);
+            	println!("Received message {}", msg_json);
                 if let Ok(relay_msg) = RelayMessage::from_json(msg_json) {
                     match relay_msg {
 			RelayMessage::Event { subscription_id, event } => {
@@ -555,7 +555,7 @@ async fn poll_for_server_output(mut rx: futures_channel::mpsc::UnboundedReceiver
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
+	// TODO add documentation for this option and use it
     let connect_addr = env::args().nth(1).unwrap_or_else(|| "50021".to_string());
 
     let addr = format!("ws://[::1]:50021");
