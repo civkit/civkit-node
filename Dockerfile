@@ -21,9 +21,7 @@ FROM ubuntu:latest
 RUN apt-get update && apt-get install -y libsqlite3-0 libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Copy the binaries from the builder stage
-COPY --from=builder /usr/src/civkit-node/target/debug/civkitd /usr/local/bin/civkitd
-COPY --from=builder /usr/src/civkit-node/target/debug/civkit-cli /usr/local/bin/civkit-cli
-COPY --from=builder /usr/src/civkit-node/target/debug/civkit-sample /usr/local/bin/civkit-sample
+COPY --from=builder /usr/src/civkit-node/target/release/civkitd /usr/local/bin/civkitd
 
 # Expose ports
 EXPOSE 50031
