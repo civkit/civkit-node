@@ -36,6 +36,13 @@ cargo build
 cd target/debug
 #run commands above like ./civkitd
 ```
+Docker Build
+------------
+
+```
+docker build -t civkit-node . 
+docker run --rm civkit-node
+```
 
 Tagline
 -------
