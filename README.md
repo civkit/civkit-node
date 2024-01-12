@@ -26,6 +26,9 @@ For more "how-to" on contributing to an open-source in the Bitcoin ecosystem, ha
 documentation written by experienced Bitcoin protocols developers on [how to make a PR](https://github.com/jonatack/bitcoin-development/blob/master/how-to-make-bitcoin-core-prs.md)
 and [how to review a PR](https://github.com/jonatack/bitcoin-development/blob/master/how-to-review-bitcoin-core-prs.md).
 
+The CivKit Developers host a civkit-node relay for inter-compatibility testing with Nostr clients and robustness
+hardnening research & development.
+
 Building
 --------
 
