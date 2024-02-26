@@ -7,6 +7,10 @@ use hex::{encode, decode};
 use bip32::{ExtendedPublicKey, ExtendedKeyAttrs, PublicKey, DerivationPath, ChildNumber};
 use serde_json::{from_str, Value};
 
+const DEPTH: &str = "0";
+const PARENT_FINGERPRINT: &str = "00000000";
+const CHILD_NUMBER: &str = "0";
+
 pub fn verify_commitments(event_commitments: Vec<Vec<u8>>, inclusion_proof: &mut InclusionProof) -> bool {
     let mut concatenated_hash = Vec::new();
     let mut latest_commitment = inclusion_proof.commitment.lock().unwrap().as_bytes().to_vec();
@@ -72,19 +76,22 @@ pub fn derive_script_pubkey_from_merkle_root(merkle_root: Vec<u8>, initial_publi
     let mut initial_chain_code_array = [0u8; 32];
     initial_chain_code_array.copy_from_slice(initial_chain_code.as_mut_slice());
 
+    let (depth, parent_fp, child_number) = get_config_values();
     let attrs = ExtendedKeyAttrs {
-        depth: 0,
-        parent_fingerprint: Default::default(),
-        child_number: Default::default(),
+        depth: depth,
+        parent_fingerprint: parent_fp,
+        child_number: ChildNumber(child_number),
         chain_code: initial_chain_code_array,
     };
 
     let initial_extended_pubkey = ExtendedPublicKey::new(initial_public_key, attrs);
     let (child_pubkey, child_chain_code) = derive_child_key_and_chaincode(&initial_extended_pubkey, &path.to_string());
     
-    let script = create_1_of_1_multisig_script(child_pubkey);
-
-    let address = bitcoin::Address::p2sh(&script, bitcoin::Network::Bitcoin).unwrap();
+    let public_key = bitcoin::util::key::PublicKey {
+        inner: bitcoin::secp256k1::PublicKey::from_slice(&child_pubkey.to_bytes()).unwrap(),
+        compressed: true,
+    };
+    let address = bitcoin::Address::p2wpkh(&public_key, bitcoin::Network::Bitcoin).unwrap();
     let script_pubkey = encode(address.script_pubkey());
 
     script_pubkey
@@ -133,16 +140,14 @@ fn derive_child_key_and_chaincode(mut parent: &ExtendedPublicKey<bip32::secp256k
     (public_key, chain_code)
 }
 
-fn create_1_of_1_multisig_script(pubkey: bip32::secp256k1::PublicKey) -> bitcoin::blockdata::script::Script {
-    let public_key = bitcoin::util::key::PublicKey {
-        inner: bitcoin::secp256k1::PublicKey::from_slice(&pubkey.to_bytes()).unwrap(),
-        compressed: true,
-    };
-    let script = bitcoin::blockdata::script::Builder::new()
-        .push_opcode(bitcoin::blockdata::opcodes::all::OP_PUSHNUM_1)
-        .push_key(&public_key)
-        .push_opcode(bitcoin::blockdata::opcodes::all::OP_PUSHNUM_1)
-        .push_opcode(bitcoin::blockdata::opcodes::all::OP_CHECKMULTISIG)
-        .into_script();
-    script
+pub fn get_config_values() -> (u8, [u8; 4], u32) {
+    let depth = DEPTH.parse::<u8>().unwrap();
+
+    let parent_fp = decode(PARENT_FINGERPRINT).unwrap();
+    let mut parent_fp_bytes = [0u8; 4];
+    parent_fp_bytes.copy_from_slice(&parent_fp);
+
+    let child_number = CHILD_NUMBER.parse().unwrap();
+
+    return (depth, parent_fp_bytes, child_number);
 }

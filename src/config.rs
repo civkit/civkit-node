@@ -88,10 +88,10 @@ impl Default for Config {
             },
             mainstay: Mainstay {
                 url: "https://mainstay.xyz/api/v1".to_string(),
-                position: 1,
+                position: 0,
                 token: "14b2b754-5806-4157-883c-732baf88849c".to_string(),
-		base_pubkey: "031dd94c5262454986a2f0a6c557d2cbe41ec5a8131c588b9367c9310125a8a7dc".to_string(),
-		chain_code: "0a090f710e47968aee906804f211cf10cde9a11e14908ca0f78cc55dd190ceaa".to_string(),
+		base_pubkey: "038695a7bf3a49d951d7e71bb0ca54158ca1a020e209653706c0dcad344f9b9d05".to_string(),
+		chain_code: "14df7ece79e83f0f479a37832d770294014edc6884b0c8bfa2e0aaf51fb00229".to_string(),
             },
 	    bitcoind_params: BitcoindParams {
 		host: "https://127.0.0.1".to_string(),
