@@ -5,79 +5,70 @@ use crate::inclusionproof::InclusionProof;
 use crate::verifycommitment::{verify_merkle_root_inclusion};
 use bitcoin::BlockHash;
 use crate::rpcclient::Client;
-use serde_json::from_str;
+use serde_json::{from_str, Value};
 
-const tx_data: &str = r#"
+const TX_DATA: &str = r#"
 {
-    "txid": "b891111d35ffc72709140b7bd2a82fde20deca53831f42a96704dede42c793d2",
-    "hash": "b891111d35ffc72709140b7bd2a82fde20deca53831f42a96704dede42c793d2",
-    "version": 2,
-    "size": 194,
-    "vsize": 194,
-    "weight": 776,
-    "locktime": 0,
-    "vin": [
-      {
-        "txid": "047352f01e5e3f8adc04a797311dde3917f274e55ceafb78edc39ff5d87d16c5",
-        "vout": 0,
-        "scriptSig": {
-          "asm": "0 30440220049d3138f841b63e96725cb9e86a53a92cd1d9e1b0740f5d4cd2ae0bcab684bf0220208d555c7e24e4c01cf67dfa9161091533e9efd6d1602bb53a49f7195c16b037[ALL] 5121036bd7943325ed9c9e1a44d98a8b5759c4bf4807df4312810ed5fc09dfb967811951ae",
-          "hex": "004730440220049d3138f841b63e96725cb9e86a53a92cd1d9e1b0740f5d4cd2ae0bcab684bf0220208d555c7e24e4c01cf67dfa9161091533e9efd6d1602bb53a49f7195c16b03701255121036bd7943325ed9c9e1a44d98a8b5759c4bf4807df4312810ed5fc09dfb967811951ae"
-        },
-        "sequence": 4294967293
+  "txid": "77a11c98ee0d323eca29466bc962325af0f3c2b73b238007030daa3e6f62837a",
+  "hash": "26c82876b561f73f75f327423df10fac22d0254c1be751d98f369fe117ad14f6",
+  "version": 1,
+  "size": 192,
+  "vsize": 110,
+  "weight": 438,
+  "locktime": 0,
+  "vin": [
+    {
+      "txid": "4b9b32dfae050222b4c07f1c730b2611d6e12750c961e700a5e94febdff6cbb0",
+      "vout": 0,
+      "scriptSig": {
+        "asm": "",
+        "hex": ""
+      },
+      "txinwitness": [
+        "3045022100a3ccdae300fd23ba8cf50000b524d082b91f8c2b65430eddcad945a5252683fd022007bed3f867908d209647b057afa61ca401e1c230903936bdd0769cd80a88da3001",
+        "0220a35481d8e9ddab95382bca286a3ddc73e5349f670321215f5be8669cfcf3ca"
+      ],
+      "sequence": 4294967293
+    }
+  ],
+  "vout": [
+    {
+      "value": 0.0009868,
+      "n": 0,
+      "scriptPubKey": {
+        "asm": "0 996d5b0d4ebeba02e72205c9731c8f6ab9b5f7b6",
+        "desc": "addr(tb1qn9k4kr2wh6aq9eezqhyhx8y0d2umtaakd08nzl)#yrwe0736",
+        "hex": "0014996d5b0d4ebeba02e72205c9731c8f6ab9b5f7b6",
+        "address": "tb1qn9k4kr2wh6aq9eezqhyhx8y0d2umtaakd08nzl",
+        "type": "witness_v0_keyhash"
       }
-    ],
-    "vout": [
-      {
-        "value": 0.01040868,
-        "n": 0,
-        "scriptPubKey": {
-          "asm": "OP_HASH160 29d13058087ddf2d48de404376fdcb5c4abff4bc OP_EQUAL",
-          "desc": "addr(35W8E71bdDhQw4ZC7uUZvXG3qhyWVYxfMB)#4rtfrxzg",
-          "hex": "a91429d13058087ddf2d48de404376fdcb5c4abff4bc87",
-          "address": "35W8E71bdDhQw4ZC7uUZvXG3qhyWVYxfMB",
-          "type": "scripthash"
-        }
-      }
-    ],
-    "hex": "0200000001c5167dd8f59fc3ed78fbea5ce574f21739de1d3197a704dc8a3f5e1ef0527304000000006f004730440220049d3138f841b63e96725cb9e86a53a92cd1d9e1b0740f5d4cd2ae0bcab684bf0220208d555c7e24e4c01cf67dfa9161091533e9efd6d1602bb53a49f7195c16b03701255121036bd7943325ed9c9e1a44d98a8b5759c4bf4807df4312810ed5fc09dfb967811951aefdffffff01e4e10f000000000017a91429d13058087ddf2d48de404376fdcb5c4abff4bc8700000000","blockhash":"000000000000000000036cb20420528cf0f00abb3a5716d80b5c87146b764d47",
-    "confirmations":15235,
-    "time":1690540748,
-    "blocktime":1690540748
+    }
+  ],
+  "hex": "01000000000101b0cbf6dfeb4fe9a500e761c95027e1d611260b731c7fc0b4220205aedf329b4b0000000000fdffffff017881010000000000160014996d5b0d4ebeba02e72205c9731c8f6ab9b5f7b602483045022100a3ccdae300fd23ba8cf50000b524d082b91f8c2b65430eddcad945a5252683fd022007bed3f867908d209647b057afa61ca401e1c230903936bdd0769cd80a88da3001210220a35481d8e9ddab95382bca286a3ddc73e5349f670321215f5be8669cfcf3ca00000000",
+  "blockhash": "000000000000c68a420a4c6e319555ed49e1d24dc319f66ce82865e44f020249",
+  "confirmations": 5,
+  "time": 1708703756,
+  "blocktime": 1708703756
 }"#;
 
-pub const TEST_MERKLE_ROOT: &str = "8d0ad2782d8f6e3f63c6f9611841c239630b55061d558abcc6bac53349edac70";
+pub const TEST_TXID: &str = "77a11c98ee0d323eca29466bc962325af0f3c2b73b238007030daa3e6f62837a";
+pub const TEST_MERKLE_ROOT: &str = "9a0ccfb086b7469053a2584a3d57e92d7dd004e24c49ff59d9b1fe6cbd656495";
+pub const TEST_COMMITMENT: &str = "4823a86fb00a38d36d1e93f6456ff61fed70b58ee3e08cf84e7980608c41ca53";
 
 #[test]
 fn test_verify_merkle_root_inclusion() {
 
-    let data_dir = util::get_default_data_dir();
-
-	  let config_path = data_dir.join("example-config.toml");
-
-    // Read the configuration file
-    let contents = fs::read_to_string(&config_path);
-    let config = match contents {
-        Ok(data) => {
-            toml::from_str(&data).expect("Could not deserialize the config file content")
-        },
-        Err(_) => {
-            // If there's an error reading the file, use the default configuration
-            Config::default()
-        }
-    };
-
-    let json_value: Value = from_str(TX_DATA_RES).unwrap();
+    let json_value: Value = from_str(TX_DATA).unwrap();
     let mut inclusion_proof = InclusionProof::new(
-        "".to_string(), 
-        "".to_string(), 
+        TEST_TXID.to_string(), 
+        TEST_COMMITMENT.to_string(), 
         TEST_MERKLE_ROOT.to_string(),
         Vec::new(),
         "".to_string(),
         json_value,
-        config.clone()
+        Config::default(),
     );
 
-    let result = verify_merkle_root_inclusion("b891111d35ffc72709140b7bd2a82fde20deca53831f42a96704dede42c793d2".to_string(), &mut inclusion_proof);
+    let result = verify_merkle_root_inclusion(&mut inclusion_proof);
     assert_eq!(result, true);
 }
